@@ -8,4 +8,4 @@ QuantumVision is a Python library designed to apply computer vision techniques t
 You can install QuantumVision directly from GitHub using pip:
 
 ```sh
-pip install git+https://github.com/your_username/QuantumVision.git
+pip install git+https://github.com/GiovTemp/Q-Vision.git
