@@ -7,6 +7,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'numpy',
+        'matplotlib',
     ],
     url='https://github.com/GiovTemp/Q-Vision',
     license='MIT',
