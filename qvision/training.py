@@ -1,7 +1,7 @@
 # Q-Vision/qvision/training.py
 
 import numpy as np
-from .neuron import neuron, optimization, spatial_loss_derivative
+from .neuron import neuron, optimization_rmsprop, spatial_loss_derivative
 from .utils import loss, accuracy
 
 def train(weights, bias, trainImgs, trainLabels, testImgs, testLabels, num_epochs, lr_weights, lr_bias, num_shots):
