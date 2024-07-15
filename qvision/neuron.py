@@ -1,5 +1,3 @@
-# Q-Vision/qvision/neuron.py
-
 import collections
 import numpy as np
 from typing import Callable
@@ -85,17 +83,27 @@ def Fourier_loss_derivative(output, target, weights, bias, Img):
 
     return weights_derivative, bias_derivative
 
-def update_rule(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias):
-    """ Parameters update rule of the gradient descent algorithm. """
-    new_weights = weights - lrWeights*np.mean(lossWeightsDerivatives, axis=0)
-    new_bias = bias - lrBias*np.mean(lossBiasDerivatives, axis=0)
-    return new_weights, new_bias
+def update_rule_rmsprop(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache_w, cache_b, decay_rate=0.99, epsilon=1e-8):
+    """ Parameters update rule for RMSprop. """
+    mean_lossWeightsDerivatives = np.mean(lossWeightsDerivatives, axis=0)
+    mean_lossBiasDerivatives = np.mean(lossBiasDerivatives, axis=0)
+    
+    cache_w = decay_rate * cache_w + (1 - decay_rate) * mean_lossWeightsDerivatives**2
+    cache_b = decay_rate * cache_b + (1 - decay_rate) * mean_lossBiasDerivatives**2
+    
+    new_weights = weights - lrWeights * mean_lossWeightsDerivatives / (np.sqrt(cache_w) + epsilon)
+    new_bias = bias - lrBias * mean_lossBiasDerivatives / (np.sqrt(cache_b) + epsilon)
+    
+    return new_weights, new_bias, cache_w, cache_b
 
-def optimization(loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots):
-    """ Gradient descent optimization. """
+def optimization_rmsprop(loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots):
+    """ RMSprop optimization. """
+    # Initialize RMSprop parameters
+    cache_w = np.zeros_like(weights)
+    cache_b = 0
+
     # Training set
     outputs = np.array([neuron(weights, bias, trainImgs[idx,:,:], num_shots) for idx in range(trainImgs.shape[0])])
-
     losses = np.array([loss(outputs[idx], targets[idx]) for idx in range(outputs.shape[0])])
 
     # History initialization
@@ -125,7 +133,7 @@ def optimization(loss_derivative: Callable, weights, bias, targets, test_targets
 
     for epoch in range(num_epochs):
         # Update weights
-        weights, bias = update_rule(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias)
+        weights, bias, cache_w, cache_b = update_rule_rmsprop(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache_w, cache_b)
 
         # Training set
         outputs = np.array([neuron(weights, bias, trainImgs[idx,:,:], num_shots) for idx in range(trainImgs.shape[0])])
