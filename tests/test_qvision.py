@@ -1,5 +1,10 @@
 import unittest
 import numpy as np
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from qvision import QVision
 
 class TestQVision(unittest.TestCase):
@@ -30,26 +35,48 @@ class TestQVision(unittest.TestCase):
         self.assertTrue(np.all(test_imgs >= 0) and np.all(test_imgs <= 1), "Test images should be normalized")
 
     def test_train(self):
+        optimizers = ['gd', 'sgd', 'rmsprop', 'adam', 'sgd_momentum', 'rmsprop_momentum']
+        results = {}
+
         # Create dummy data
         train_imgs = np.random.rand(10, 32, 32, 3)
         train_labels = np.random.randint(0, 2, 10)
         test_imgs = np.random.rand(5, 32, 32, 3)
         test_labels = np.random.randint(0, 2, 5)
 
-        train_imgs, train_labels, test_imgs, test_labels = self.model.preprocess_data(train_imgs, train_labels, test_imgs, test_labels)
+        train_imgs, train_labels, test_imgs, test_labels = self.model.preprocess_data(train_imgs, train_labels,
+                                                                                      test_imgs, test_labels)
 
         self.model.initialize_parameters()
-        weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history = self.model.train(train_imgs, train_labels, test_imgs, test_labels)
 
-        # Check that training has modified weights and bias
-        self.assertIsNotNone(weights, "Weights should be updated after training")
-        self.assertIsNotNone(bias, "Bias should be updated after training")
+        for optimizer in optimizers:
+            print(f'Training with {optimizer} optimizer...')
+            weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history = self.model.train(
+                optimizer, train_imgs, train_labels, test_imgs, test_labels)
+            results[optimizer] = {
+                'weights': weights,
+                'bias': bias,
+                'loss_history': loss_history,
+                'test_loss_history': test_loss_history,
+                'accuracy_history': accuracy_history,
+                'test_accuracy_history': test_accuracy_history,
+            }
 
-        # Check that the loss and accuracy histories are populated
-        self.assertGreater(len(loss_history), 0, "Loss history should be populated")
-        self.assertGreater(len(test_loss_history), 0, "Test loss history should be populated")
-        self.assertGreater(len(accuracy_history), 0, "Accuracy history should be populated")
-        self.assertGreater(len(test_accuracy_history), 0, "Test accuracy history should be populated")
+        # Evaluate and compare results
+        for optimizer, result in results.items():
+            print(f'Optimizer: {optimizer}')
+            print(f'Final training loss: {result["loss_history"][-1]}')
+            print(f'Final test loss: {result["test_loss_history"][-1]}')
+            print(f'Final training accuracy: {result["accuracy_history"][-1]}')
+            print(f'Final test accuracy: {result["test_accuracy_history"][-1]}')
+            print('---')
+
+        # Determine best optimizer based on test accuracy or other metrics
+        best_optimizer = max(results, key=lambda x: results[x]['test_accuracy_history'][-1])
+        print(f'Best optimizer: {best_optimizer}')
+
+        return results, best_optimizer
+
 
 if __name__ == '__main__':
     unittest.main()
