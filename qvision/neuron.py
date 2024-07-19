@@ -61,6 +61,7 @@ def neuron(weights, bias, img, num_shots, efficiency=1.0, dead_time=0.0, resolvi
     # Compute the activation function using the coincidence probability
     return sig(f + bias)
 
+
 def spatial_loss_derivative(output, target, weights, bias, Img):
     """ Compute the derivative of the binary cross-entropy with respect to the
         neuron parameters, with spatial-encoded input. """
@@ -226,11 +227,13 @@ def optimizer(optimizer, loss_derivative: Callable, weights, bias, targets, test
 # Define the common optimization function
 def common_optimization(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, update_fn: Callable, **kwargs
+        lrWeights, lrBias, num_shots, update_fn: Callable, efficiency=1.0, dead_time=0.0, resolving_power=1, **kwargs
 ):
     """Common optimization loop."""
     # Training set
-    outputs = np.array([neuron(weights, bias, trainImgs[idx, :, :], num_shots) for idx in range(trainImgs.shape[0])])
+    outputs = np.array(
+        [neuron(weights, bias, trainImgs[idx, :, :], num_shots, efficiency, dead_time, resolving_power) for idx in
+         range(trainImgs.shape[0])])
     losses = np.array([loss(outputs[idx], targets[idx]) for idx in range(outputs.shape[0])])
 
     # History initialization
@@ -252,7 +255,9 @@ def common_optimization(
         )
 
     # Validation set
-    test_outputs = np.array([neuron(weights, bias, testImgs[idx, :, :], num_shots) for idx in range(testImgs.shape[0])])
+    test_outputs = np.array(
+        [neuron(weights, bias, testImgs[idx, :, :], num_shots, efficiency, dead_time, resolving_power) for idx in
+         range(testImgs.shape[0])])
     test_losses = np.array([loss(test_outputs[idx], test_targets[idx]) for idx in range(test_outputs.shape[0])])
 
     test_loss_history = [np.mean(test_losses)]
@@ -272,7 +277,8 @@ def common_optimization(
 
         # Training set
         outputs = np.array(
-            [neuron(weights, bias, trainImgs[idx, :, :], num_shots) for idx in range(trainImgs.shape[0])])
+            [neuron(weights, bias, trainImgs[idx, :, :], num_shots, efficiency, dead_time, resolving_power) for idx in
+             range(trainImgs.shape[0])])
         losses = np.array([loss(outputs[idx], targets[idx]) for idx in range(outputs.shape[0])])
         loss_history.append(np.mean(losses))
 
@@ -470,88 +476,100 @@ def adam_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWe
     return weights, bias, {'m_weights': m_weights, 'v_weights': v_weights, 'm_bias': m_bias, 'v_bias': v_bias}
 
 
+# Standard Optimization
 def optimization_standard_gd(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots
+        lrWeights, lrBias, num_shots, efficiency=1.0, dead_time=0.0, resolving_power=1
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, standard_gd_update
+        lrWeights, lrBias, num_shots, standard_gd_update, efficiency=efficiency, dead_time=dead_time,
+        resolving_power=resolving_power
     )
 
 
 # RMSProp optimization function
 def optimization_rmsprop(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, decay_rate=0.9, epsilon=1e-8
+        lrWeights, lrBias, num_shots, decay_rate=0.9, epsilon=1e-8, efficiency=1.0, dead_time=0.0, resolving_power=1
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, rmsprop_update, decay_rate=decay_rate, epsilon=epsilon
+        lrWeights, lrBias, num_shots, rmsprop_update, decay_rate=decay_rate, epsilon=epsilon,
+        efficiency=efficiency, dead_time=dead_time, resolving_power=resolving_power
     )
 
 
 # Adam optimization function
 def optimization_adam(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, beta1=0.9, beta2=0.999, epsilon=1e-8
+        lrWeights, lrBias, num_shots, beta1=0.9, beta2=0.999, epsilon=1e-8, efficiency=1.0, dead_time=0.0,
+        resolving_power=1
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, adam_update, beta1=beta1, beta2=beta2, epsilon=epsilon, t=1
+        lrWeights, lrBias, num_shots, adam_update, beta1=beta1, beta2=beta2, epsilon=epsilon, t=1,
+        efficiency=efficiency, dead_time=dead_time, resolving_power=resolving_power
     )
 
 
 # SGD with momentum optimization function
 def optimization_sgd_momentum(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, momentum=0.9
+        lrWeights, lrBias, num_shots, momentum=0.9, efficiency=1.0, dead_time=0.0, resolving_power=1
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, sgd_momentum_update, momentum=momentum
+        lrWeights, lrBias, num_shots, sgd_momentum_update, momentum=momentum,
+        efficiency=efficiency, dead_time=dead_time, resolving_power=resolving_power
     )
 
 
 # SGD optimization function
 def optimization_sgd(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots
+        lrWeights, lrBias, num_shots, efficiency=1.0, dead_time=0.0, resolving_power=1
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, sgd_update
+        lrWeights, lrBias, num_shots, sgd_update,
+        efficiency=efficiency, dead_time=dead_time, resolving_power=resolving_power
     )
 
 
 # AdaGrad optimization function
 def optimization_adagrad(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, epsilon=1e-8
+        lrWeights, lrBias, num_shots, epsilon=1e-8, efficiency=1.0, dead_time=0.0, resolving_power=1
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, adagrad_update, epsilon=epsilon
+        lrWeights, lrBias, num_shots, adagrad_update, epsilon=epsilon,
+        efficiency=efficiency, dead_time=dead_time, resolving_power=resolving_power
     )
 
 
 # RMSProp with momentum optimization function
 def optimization_rmsprop_momentum(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, decay_rate=0.9, epsilon=1e-8, momentum=0.9
+        lrWeights, lrBias, num_shots, decay_rate=0.9, epsilon=1e-8, momentum=0.9, efficiency=1.0, dead_time=0.0,
+        resolving_power=1
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, rmsprop_momentum_update, decay_rate=decay_rate, epsilon=epsilon, momentum=momentum
+        lrWeights, lrBias, num_shots, rmsprop_momentum_update, decay_rate=decay_rate, epsilon=epsilon,
+        momentum=momentum,
+        efficiency=efficiency, dead_time=dead_time, resolving_power=resolving_power
     )
 
 
 # AdaDelta optimization function
 def optimization_adadelta(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, epsilon=1e-8, rho=0.9
+        lrWeights, lrBias, num_shots, epsilon=1e-8, rho=0.9, efficiency=1.0, dead_time=0.0, resolving_power=1
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, adadelta_update, epsilon=epsilon, rho=rho
+        lrWeights, lrBias, num_shots, adadelta_update, epsilon=epsilon, rho=rho,
+        efficiency=efficiency, dead_time=dead_time, resolving_power=resolving_power
     )
