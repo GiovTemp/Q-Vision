@@ -5,20 +5,60 @@ import numpy as np
 from typing import Callable, Tuple
 
 from .utils import sig, sigPrime, loss, accuracy
+from .photon_detector import PhotonDetector
 
-def neuron(weights, bias, Img, num_shots):
-    """ Compute the output of the quantum optical neuron, with parameters
-        weights and bias, and input Img. The predicted probability is sampled
-        for a given number of shots (deactived by choosing shots = -1). """
+import numpy as np
+from .utils import sig
+from .photon_detector import PhotonDetector
+
+
+def neuron(weights, bias, img, num_shots, efficiency=1.0, dead_time=0.0, resolving_power=1):
+    """
+    Compute the output of the quantum optical neuron using non-ideal photon detectors.
+
+    weights: array-like, weights of the neuron.
+    bias: float, bias of the neuron.
+    img: 2D array, input image.
+    num_shots: int, number of shots for sampling.
+    efficiency: float, efficiency of the photon detector (between 0 and 1).
+    dead_time: float, dead time of the photon detector (in arbitrary time units).
+    resolving_power: int, resolving power of the photon detector.
+
+    Returns the output of the neuron.
+    """
+    # Calculate the norm of the weights
     norm = np.sqrt(np.sum(np.square(weights)))
-    prob = np.abs(np.sum(np.multiply(Img, weights/norm)))**2
-    # Sampling (1: Coincidence)
+
+    # Normalize the weights
+    normalized_weights = weights / norm
+
+    # Calculate the HOM interference probability
+    prob = np.abs(np.sum(np.multiply(img, normalized_weights))) ** 2
+
+    # Create the photon detector instance
+    detector = PhotonDetector(efficiency=efficiency, dead_time=dead_time, resolving_power=resolving_power)
+
+    # Coincidence sampling
     if num_shots == -1:
-        f = prob
+        # Use the detector to calculate the probability once
+        detected_photons = detector.detect(1 if np.random.rand() < prob else 0, 0)
+        f = detected_photons * prob  # Single shot, so scale by prob
     else:
-        samples = np.random.choice([0, 1], num_shots, p=[1 - prob, prob])
-        counter = collections.Counter(samples)
-        f = counter[1]/num_shots
+        # Initialize sampling
+        detected_photons_total = 0
+        current_time = 0
+        # Sampling loop (for `num_shots` times)
+        for _ in range(num_shots):
+            # Photon detection
+            detected_photons = detector.detect(1 if np.random.rand() < prob else 0, current_time)
+            # Accumulate detected photons
+            detected_photons_total += detected_photons
+            # Update current time
+            current_time += 1  # Increment time (arbitrary units)
+        # Calculate the average coincidences as a probability
+        f = (detected_photons_total / num_shots) * prob
+
+    # Compute the activation function using the coincidence probability
     return sig(f + bias)
 
 def spatial_loss_derivative(output, target, weights, bias, Img):
@@ -38,20 +78,21 @@ def spatial_loss_derivative(output, target, weights, bias, Img):
     norm = np.sqrt(np.sum(np.square(weights)))
 
     # Compute the derivative with respect to the weights
-    g = np.sum(np.multiply(Img, weights/norm)) # <I, U>
-    gPrime = (Img - g*weights/norm)/norm # <I, dlambdaU>
+    g = np.sum(np.multiply(Img, weights / norm))  # <I, U>
+    gPrime = (Img - g * weights / norm) / norm  # <I, dlambdaU>
 
-    fPrime = 2*np.real(g*np.conjugate(gPrime)) # 2Re[<I, U><I, dU>*]
+    fPrime = 2 * np.real(g * np.conjugate(gPrime))  # 2Re[<I, U><I, dU>*]
 
-    crossPrime = (F - y)/(F*(1-F))
+    crossPrime = (F - y) / (F * (1 - F))
 
-    gAbs = np.abs(g) # sqrt(f)
-    weights_derivative = crossPrime*sigPrime(gAbs**2 + bias)*fPrime
+    gAbs = np.abs(g)  # sqrt(f)
+    weights_derivative = crossPrime * sigPrime(gAbs ** 2 + bias) * fPrime
 
     # Compute the derivative with respect to the bias
-    bias_derivative = crossPrime*sigPrime(gAbs**2 + bias)
+    bias_derivative = crossPrime * sigPrime(gAbs ** 2 + bias)
 
     return weights_derivative, bias_derivative
+
 
 def Fourier_loss_derivative(output, target, weights, bias, Img):
     """ Compute the derivative of the binary cross-entropy with respect to the
@@ -70,20 +111,21 @@ def Fourier_loss_derivative(output, target, weights, bias, Img):
     norm = np.sqrt(np.sum(np.square(weights)))
 
     # Compute the derivative with respect to the weights
-    g = np.sum(np.multiply(Img, weights/norm)) # <I, U>
-    gAbs = np.abs(g) # sqrt(f)
+    g = np.sum(np.multiply(Img, weights / norm))  # <I, U>
+    gAbs = np.abs(g)  # sqrt(f)
 
-    gPrime = (Img - gAbs*weights/norm)/norm # Approximation
-    fPrime = 2*np.real(gAbs*np.conjugate(gPrime)) # Approximation
+    gPrime = (Img - gAbs * weights / norm) / norm  # Approximation
+    fPrime = 2 * np.real(gAbs * np.conjugate(gPrime))  # Approximation
 
-    crossPrime = (F - y)/(F*(1-F))
+    crossPrime = (F - y) / (F * (1 - F))
 
-    weights_derivative = crossPrime*sigPrime(gAbs**2 + bias)*fPrime
+    weights_derivative = crossPrime * sigPrime(gAbs ** 2 + bias) * fPrime
 
     # Compute the derivative with respect to the bias
-    bias_derivative = crossPrime*sigPrime(gAbs**2 + bias)
+    bias_derivative = crossPrime * sigPrime(gAbs ** 2 + bias)
 
     return weights_derivative, bias_derivative
+
 
 # def update_rule(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias):
 #     """ Parameters update rule of the gradient descent algorithm. """
@@ -153,23 +195,32 @@ def Fourier_loss_derivative(output, target, weights, bias, Img):
 #
 #     return weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history
 
-def optimizer(optimizer, loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots):
+def optimizer(optimizer, loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs,
+              num_epochs, lrWeights, lrBias, num_shots):
     if optimizer == 'gd':
-        return optimization_standard_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,lrWeights, lrBias, num_shots)
+        return optimization_standard_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs,
+                                        num_epochs, lrWeights, lrBias, num_shots)
     if optimizer == 'rmsprop':
-         return optimization_rmsprop(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,lrWeights, lrBias, num_shots, decay_rate=0.9, epsilon=1e-8)
+        return optimization_rmsprop(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs,
+                                    num_epochs, lrWeights, lrBias, num_shots, decay_rate=0.9, epsilon=1e-8)
     elif optimizer == 'adam':
-        return optimization_adam(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, beta1=0.9, beta2=0.999, epsilon=1e-8)
+        return optimization_adam(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+                                 lrWeights, lrBias, num_shots, beta1=0.9, beta2=0.999, epsilon=1e-8)
     elif optimizer == 'sgd':
-        return optimization_sgd_momentum(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, momentum=0.9)
+        return optimization_sgd_momentum(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs,
+                                         num_epochs, lrWeights, lrBias, num_shots, momentum=0.9)
     elif optimizer == 'sgd_momentum':
-        return optimization_sgd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots)
+        return optimization_sgd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+                                lrWeights, lrBias, num_shots)
     elif optimizer == 'ada_grad':
-        return optimization_adagrad(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, epsilon=1e-8)
+        return optimization_adagrad(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs,
+                                    num_epochs, lrWeights, lrBias, num_shots, epsilon=1e-8)
     elif optimizer == 'rmsprop_momentum':
-        return optimization_sgd_momentum(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, momentum=0.9)
+        return optimization_sgd_momentum(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs,
+                                         num_epochs, lrWeights, lrBias, num_shots, momentum=0.9)
     elif optimizer == 'ada_delta':
-        return optimization_adadelta(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, epsilon=1e-8, rho=0.9)
+        return optimization_adadelta(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs,
+                                     num_epochs, lrWeights, lrBias, num_shots, epsilon=1e-8, rho=0.9)
 
 
 # Define the common optimization function
@@ -249,14 +300,17 @@ def common_optimization(
 
     return weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history
 
+
 def standard_gd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache):
     """ Parameters update rule of the gradient descent algorithm. """
     new_weights = weights - lrWeights * np.mean(lossWeightsDerivatives, axis=0)
     new_bias = bias - lrBias * np.mean(lossBiasDerivatives, axis=0)
     return new_weights, new_bias, cache
 
+
 # Define the AdaDelta update function
-def adadelta_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, epsilon=1e-8, rho=0.9):
+def adadelta_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, epsilon=1e-8,
+                    rho=0.9):
     # Initialize cache if not already initialized
     if 'accumulated_gradient_weights' not in cache:
         cache['accumulated_gradient_weights'] = np.zeros_like(weights)
@@ -275,11 +329,14 @@ def adadelta_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, 
     accumulated_gradient_bias = rho * accumulated_gradient_bias + (1 - rho) * np.square(lossBiasDerivatives)
 
     # Compute update step
-    update_weights = np.sqrt((cache['accumulated_update_weights'] + epsilon) / (accumulated_gradient_weights + epsilon)) * lossWeightsDerivatives
-    update_bias = np.sqrt((cache['accumulated_update_bias'] + epsilon) / (accumulated_gradient_bias + epsilon)) * lossBiasDerivatives
+    update_weights = np.sqrt((cache['accumulated_update_weights'] + epsilon) / (
+            accumulated_gradient_weights + epsilon)) * lossWeightsDerivatives
+    update_bias = np.sqrt(
+        (cache['accumulated_update_bias'] + epsilon) / (accumulated_gradient_bias + epsilon)) * lossBiasDerivatives
 
     # Update accumulated update step
-    cache['accumulated_update_weights'] = rho * cache['accumulated_update_weights'] + (1 - rho) * np.square(update_weights)
+    cache['accumulated_update_weights'] = rho * cache['accumulated_update_weights'] + (1 - rho) * np.square(
+        update_weights)
     cache['accumulated_update_bias'] = rho * cache['accumulated_update_bias'] + (1 - rho) * np.square(update_bias)
 
     # Update weights and bias
@@ -291,6 +348,7 @@ def adadelta_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, 
     cache['accumulated_gradient_bias'] = accumulated_gradient_bias
 
     return weights, bias, cache
+
 
 # Define the RMSProp with momentum update function
 def rmsprop_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache,
@@ -311,15 +369,16 @@ def rmsprop_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDeriv
 
     # Update velocity with momentum
     cache['velocity_weights'] = momentum * cache['velocity_weights'] + lrWeights * lossWeightsDerivatives / (
-                np.sqrt(cache['cache_weights']) + epsilon)
+            np.sqrt(cache['cache_weights']) + epsilon)
     cache['velocity_bias'] = momentum * cache['velocity_bias'] + lrBias * lossBiasDerivatives / (
-                np.sqrt(cache['cache_bias']) + epsilon)
+            np.sqrt(cache['cache_bias']) + epsilon)
 
     # Update weights and bias
     weights -= cache['velocity_weights']
     bias -= cache['velocity_bias']
 
     return weights, bias, cache
+
 
 # Define the AdaGrad update function
 def adagrad_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, epsilon=1e-8):
@@ -339,6 +398,7 @@ def adagrad_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, l
 
     return weights, bias, cache
 
+
 # Define the SGD update function
 def sgd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache):
     # Update parameters
@@ -347,8 +407,10 @@ def sgd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWei
 
     return weights, bias, cache
 
+
 # Define the SGD with momentum update function
-def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, momentum=0.9):
+def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache,
+                        momentum=0.9):
     velocity_weights = cache.get('velocity_weights', np.zeros_like(weights))
     velocity_bias = cache.get('velocity_bias', np.zeros_like(bias))
 
@@ -407,6 +469,7 @@ def adam_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWe
 
     return weights, bias, {'m_weights': m_weights, 'v_weights': v_weights, 'm_bias': m_bias, 'v_bias': v_bias}
 
+
 def optimization_standard_gd(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
         lrWeights, lrBias, num_shots
@@ -438,35 +501,39 @@ def optimization_adam(
         lrWeights, lrBias, num_shots, adam_update, beta1=beta1, beta2=beta2, epsilon=epsilon, t=1
     )
 
+
 # SGD with momentum optimization function
 def optimization_sgd_momentum(
-    loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-    lrWeights, lrBias, num_shots, momentum=0.9
+        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+        lrWeights, lrBias, num_shots, momentum=0.9
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
         lrWeights, lrBias, num_shots, sgd_momentum_update, momentum=momentum
     )
 
+
 # SGD optimization function
 def optimization_sgd(
-    loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-    lrWeights, lrBias, num_shots
+        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+        lrWeights, lrBias, num_shots
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
         lrWeights, lrBias, num_shots, sgd_update
     )
 
+
 # AdaGrad optimization function
 def optimization_adagrad(
-    loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-    lrWeights, lrBias, num_shots, epsilon=1e-8
+        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+        lrWeights, lrBias, num_shots, epsilon=1e-8
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
         lrWeights, lrBias, num_shots, adagrad_update, epsilon=epsilon
     )
+
 
 # RMSProp with momentum optimization function
 def optimization_rmsprop_momentum(
@@ -477,6 +544,7 @@ def optimization_rmsprop_momentum(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
         lrWeights, lrBias, num_shots, rmsprop_momentum_update, decay_rate=decay_rate, epsilon=epsilon, momentum=momentum
     )
+
 
 # AdaDelta optimization function
 def optimization_adadelta(
