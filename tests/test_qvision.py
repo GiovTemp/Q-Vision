@@ -46,13 +46,14 @@ class TestQVision(unittest.TestCase):
 
         train_imgs, train_labels, test_imgs, test_labels = self.model.preprocess_data(train_imgs, train_labels,
                                                                                       test_imgs, test_labels)
-
         self.model.initialize_parameters()
+
+        phase_shifts = np.random.uniform(0, 2 * np.pi, (32, 32))
 
         for optimizer in optimizers:
             print(f'Training with {optimizer} optimizer...')
             weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history = self.model.train(
-                optimizer, train_imgs, train_labels, test_imgs, test_labels)
+                optimizer, train_imgs, train_labels, test_imgs, test_labels, phase_shifts)
             results[optimizer] = {
                 'weights': weights,
                 'bias': bias,
