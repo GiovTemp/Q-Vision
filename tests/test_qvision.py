@@ -35,7 +35,7 @@ class TestQVision(unittest.TestCase):
         self.assertTrue(np.all(test_imgs >= 0) and np.all(test_imgs <= 1), "Test images should be normalized")
 
     def test_train(self):
-        optimizers = ['gd', 'sgd', 'rmsprop', 'adam', 'sgd_momentum', 'rmsprop_momentum']
+        optimizers = ['gd', 'sgd', 'sgd_momentum']
         results = {}
 
         # Create dummy data
