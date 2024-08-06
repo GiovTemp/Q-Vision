@@ -169,46 +169,66 @@ def common_optimization(
         lrWeights, lrBias, num_shots, update_fn: Callable, **kwargs
 ):
     """Common optimization loop."""
-    # Training set
-    outputs = np.array([neuron(weights, bias, trainImgs[idx, :, :], num_shots) for idx in range(trainImgs.shape[0])])
-    losses = np.array([loss(outputs[idx], targets[idx]) for idx in range(outputs.shape[0])])
-
     # History initialization
-    loss_history = [np.mean(losses)]
-    accuracy_history = [accuracy(outputs, targets)]
-
-    # Weights initialization
-    lossWeightsDerivatives = np.zeros(trainImgs.shape)
-    lossBiasDerivatives = np.zeros(trainImgs.shape[0])
+    loss_history = []
+    accuracy_history = []
 
     # Cache initialization
     cache = kwargs.get('cache', {})
     t = kwargs.get('t', 1)
 
-    # Compute derivatives of the loss function
-    for idx in range(trainImgs.shape[0]):
-        lossWeightsDerivatives[idx, :, :], lossBiasDerivatives[idx] = loss_derivative(
-            outputs[idx], targets[idx], weights, bias, trainImgs[idx, :, :]
-        )
-
-    # Validation set
-    test_outputs = np.array([neuron(weights, bias, testImgs[idx, :, :], num_shots) for idx in range(testImgs.shape[0])])
-    test_losses = np.array([loss(test_outputs[idx], test_targets[idx]) for idx in range(test_outputs.shape[0])])
-
-    test_loss_history = [np.mean(test_losses)]
-    test_accuracy_history = [accuracy(test_outputs, test_targets)]
-
-    # Verbose
+    # Verbose initial values
     print('EPOCH', 0)
+    initial_outputs = np.array(
+        [neuron(weights, bias, trainImgs[idx, :, :], num_shots) for idx in range(trainImgs.shape[0])])
+    initial_losses = np.array([loss(initial_outputs[idx], targets[idx]) for idx in range(initial_outputs.shape[0])])
+    initial_test_outputs = np.array(
+        [neuron(weights, bias, testImgs[idx, :, :], num_shots) for idx in range(testImgs.shape[0])])
+    initial_test_losses = np.array(
+        [loss(initial_test_outputs[idx], test_targets[idx]) for idx in range(initial_test_outputs.shape[0])])
+
+    loss_history.append(np.mean(initial_losses))
+    accuracy_history.append(accuracy(initial_outputs, targets))
+
+    test_loss_history = [np.mean(initial_test_losses)]
+    test_accuracy_history = [accuracy(initial_test_outputs, test_targets)]
+
     print('Loss', loss_history[0], 'Val_Loss', test_loss_history[0])
     print('Accuracy', accuracy_history[0], 'Val_Acc', test_accuracy_history[0])
     print('---')
 
     for epoch in range(num_epochs):
-        # Update weights using the specific optimizer
-        weights, bias, cache = update_fn(
-            weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, **kwargs
-        )
+        if update_fn == standard_gd_update:
+            # Compute derivatives of the loss function for the whole dataset
+            outputs = np.array(
+                [neuron(weights, bias, trainImgs[idx, :, :], num_shots) for idx in range(trainImgs.shape[0])])
+            losses = np.array([loss(outputs[idx], targets[idx]) for idx in range(outputs.shape[0])])
+            lossWeightsDerivatives = np.array(
+                [loss_derivative(outputs[idx], targets[idx], weights, bias, trainImgs[idx, :, :])[0] for idx in
+                 range(trainImgs.shape[0])])
+            lossBiasDerivatives = np.array(
+                [loss_derivative(outputs[idx], targets[idx], weights, bias, trainImgs[idx, :, :])[1] for idx in
+                 range(trainImgs.shape[0])])
+
+            # Update weights using the specific optimizer
+            weights, bias, cache = update_fn(
+                weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, **kwargs
+            )
+        elif update_fn == sgd_update:
+            for _ in range(trainImgs.shape[0]):
+                # Extract a random sample
+                idx = np.random.randint(0, trainImgs.shape[0])
+
+                # Compute derivatives of the loss function for the random sample
+                output = neuron(weights, bias, trainImgs[idx, :, :], num_shots)
+                lossWeightDerivative, lossBiasDerivative = loss_derivative(
+                    output, targets[idx], weights, bias, trainImgs[idx, :, :]
+                )
+
+                # Update weights using the specific optimizer (SGD in this case)
+                weights, bias, cache = update_fn(
+                    weights, bias, lossWeightDerivative, lossBiasDerivative, lrWeights, lrBias, cache, **kwargs
+                )
 
         # Training set
         outputs = np.array(
@@ -226,12 +246,6 @@ def common_optimization(
         test_loss_history.append(np.mean(test_losses))
         test_accuracy_history.append(accuracy(test_outputs, test_targets))
 
-        # Update loss derivative
-        for idx in range(trainImgs.shape[0]):
-            lossWeightsDerivatives[idx, :, :], lossBiasDerivatives[idx] = loss_derivative(
-                outputs[idx], targets[idx], weights, bias, trainImgs[idx, :, :]
-            )
-
         # Verbose
         print('EPOCH', epoch + 1)
         print('Loss', loss_history[epoch + 1], 'Val_Loss', test_loss_history[epoch + 1])
@@ -239,7 +253,6 @@ def common_optimization(
         print('---')
 
     return weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history
-
 def standard_gd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache):
     """ Parameters update rule of the gradient descent algorithm. """
     new_weights = weights - lrWeights * np.mean(lossWeightsDerivatives, axis=0)
@@ -249,10 +262,8 @@ def standard_gd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivative
 
 # Define the SGD update function
 def sgd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache):
-    # Update parameters
-    weights -= lrWeights * np.mean(lossWeightsDerivatives, axis=0)
-    bias -= lrBias * np.mean(lossBiasDerivatives, axis=0)
-
+    weights -= lrWeights * lossWeightsDerivatives
+    bias -= lrBias * lossBiasDerivatives
     return weights, bias, cache
 
 # Define the SGD with momentum update function , TODO da testare
