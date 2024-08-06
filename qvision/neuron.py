@@ -255,9 +255,9 @@ def sgd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWei
 
     return weights, bias, cache
 
-# Define the SGD with momentum update function
+# Define the SGD with momentum update function , TODO da testare
 def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, momentum=0.9):
-    velocity_weights = cache.get('velocity_weights', np.zeros_like(weights))
+    velocity_weights = cache.get('velocity_weights', np.zeros_like(weights)) #TODO Cache è necessario?
     velocity_bias = cache.get('velocity_bias', np.zeros_like(bias))
 
     # Update velocities
