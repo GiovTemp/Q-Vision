@@ -215,9 +215,11 @@ def common_optimization(
                 weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, **kwargs
             )
         elif update_fn == sgd_update:
-            for _ in range(trainImgs.shape[0]):
-                # Extract a random sample
-                idx = np.random.randint(0, trainImgs.shape[0])
+            # Shuffle indices at the start of each epoch
+            indices = np.random.permutation(trainImgs.shape[0])
+            #To prevent the same index from being re-used
+            # 1 - Permutation of alla indices
+            for idx in indices:
 
                 # Compute derivatives of the loss function for the random sample
                 output = neuron(weights, bias, trainImgs[idx, :, :], num_shots)
@@ -253,6 +255,7 @@ def common_optimization(
         print('---')
 
     return weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history
+
 def standard_gd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache):
     """ Parameters update rule of the gradient descent algorithm. """
     new_weights = weights - lrWeights * np.mean(lossWeightsDerivatives, axis=0)
