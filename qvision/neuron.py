@@ -166,7 +166,7 @@ def optimizer(optimizer_function, loss_derivative: Callable, weights, bias, targ
 # Define the common optimization function
 def common_optimization(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, update_fn: Callable, momentum, **kwargs
+        lrWeights, lrBias, num_shots, update_fn: Callable, momentum: 0.9, **kwargs
 ):
     """Common optimization loop."""
     # History initialization
