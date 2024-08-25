@@ -166,7 +166,7 @@ def optimizer(optimizer_function, loss_derivative: Callable, weights, bias, targ
 # Define the common optimization function
 def common_optimization(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, update_fn: Callable, **kwargs
+        lrWeights, lrBias, num_shots, update_fn: Callable, momentum, **kwargs
 ):
     """Common optimization loop."""
     # History initialization
@@ -214,23 +214,28 @@ def common_optimization(
             weights, bias, cache = update_fn(
                 weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, **kwargs
             )
-        elif update_fn == sgd_update:
             # Shuffle indices at the start of each epoch
             indices = np.random.permutation(trainImgs.shape[0])
-            #To prevent the same index from being re-used
-            # 1 - Permutation of alla indices
             for idx in indices:
-
                 # Compute derivatives of the loss function for the random sample
                 output = neuron(weights, bias, trainImgs[idx, :, :], num_shots)
                 lossWeightDerivative, lossBiasDerivative = loss_derivative(
                     output, targets[idx], weights, bias, trainImgs[idx, :, :]
                 )
 
-                # Update weights using the specific optimizer (SGD in this case)
-                weights, bias, cache = update_fn(
-                    weights, bias, lossWeightDerivative, lossBiasDerivative, lrWeights, lrBias, cache, **kwargs
-                )
+                # Se la funzione di aggiornamento è sgd_momentum_update, applica il momentum
+                if update_fn == sgd_momentum_update:
+                    # Aggiornamento del momentum
+                    weights, bias, cache = update_fn(
+                        weights, bias, lossWeightDerivative, lossBiasDerivative, lrWeights, lrBias, cache,
+                        momentum=momentum, **kwargs
+                    )
+
+                else:
+                    # Aggiornamento standard SGD senza momentum
+                    weights, bias, cache = update_fn(
+                        weights, bias, lossWeightDerivative, lossBiasDerivative, lrWeights, lrBias, cache, **kwargs
+                    )
 
         # Training set
         outputs = np.array(
@@ -270,7 +275,7 @@ def sgd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWei
     return weights, bias, cache
 
 # Define the SGD with momentum update function , TODO da testare
-def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, momentum=0.9):
+def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, momentum):
     velocity_weights = cache.get('velocity_weights', np.zeros_like(weights)) #TODO Cache è necessario?
     velocity_bias = cache.get('velocity_bias', np.zeros_like(bias))
 
@@ -298,7 +303,7 @@ def optimization_standard_gd(
 # SGD with momentum optimization function
 def optimization_sgd_momentum(
     loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-    lrWeights, lrBias, num_shots, momentum=0.9
+    lrWeights, lrBias, num_shots, momentum
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
