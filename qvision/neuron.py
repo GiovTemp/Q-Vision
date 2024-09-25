@@ -154,15 +154,16 @@ def Fourier_loss_derivative(output, target, weights, bias, Img):
 #     return weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history
 
 
-def optimizer(optimizer_function, loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, **kwargs):
+def optimizer(optimizer_function, loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs,
+              num_epochs, lrWeights, lrBias, num_shots, momentum, batch_size, **kwargs):
     if optimizer_function == 'gd':
         return optimization_standard_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, **kwargs)
     elif optimizer_function == 'sgd':
         return optimization_sgd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, **kwargs)
     elif optimizer_function == 'sgd_momentum':
-        return optimization_sgd_momentum(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, momentum=0.9, **kwargs)
+        return optimization_sgd_momentum(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, momentum, **kwargs)
     elif optimizer_function == 'mini_batch_gd':
-        return optimization_minibatch_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, batch_size=kwargs.get('batch_size', 32), **kwargs)
+        return optimization_minibatch_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, batch_size, **kwargs)
 
 def common_optimization(
     loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
@@ -334,7 +335,7 @@ def optimization_sgd(
 
 def optimization_sgd_momentum(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, momentum=0.9, **kwargs
+        lrWeights, lrBias, num_shots, momentum, **kwargs
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
@@ -343,7 +344,7 @@ def optimization_sgd_momentum(
 
 def optimization_minibatch_gd(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, batch_size=32, **kwargs
+        lrWeights, lrBias, num_shots, batch_size, **kwargs
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
