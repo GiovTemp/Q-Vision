@@ -6,14 +6,15 @@ from .training import train
 
 
 class QVision:
-    def __init__(self, input_shape=(32, 32), num_epochs=150, lr_weights=0.075, lr_bias=0.005, num_shots=-1):
+    def __init__(self, input_shape=(32, 32), num_epochs=150, lr_weights=0.075, lr_bias=0.005, num_shots=-1,
+                 momentum=0.9, batch_size=32):
         self.input_shape = input_shape
         self.num_epochs = num_epochs
         self.lr_weights = lr_weights
         self.lr_bias = lr_bias
         self.num_shots = num_shots
-        self.momentum = 0.9
-        self.batch_size = 32
+        self.momentum = momentum
+        self.batch_size = batch_size
         self.weights = None
         self.bias = 0
         self.loss_history = []
