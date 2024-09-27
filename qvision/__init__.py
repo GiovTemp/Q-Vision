@@ -6,4 +6,4 @@ from .preprocessing import rgb2gray, convert_to_float, convert_and_normalize, ca
 from .training import train
 from .visualization import plot_loss_accuracy
 from .qvision import QVision
-from .phase_modulation import *
+from .phase_modulation import neuron, spatial_loss_derivative, Fourier_loss_derivative
