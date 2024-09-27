@@ -52,7 +52,7 @@ class TestQVision(unittest.TestCase):
         for optimizer in optimizers:
             print(f'Training with {optimizer} optimizer...')
             weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history = self.model.train(
-                optimizer, train_imgs, train_labels, test_imgs, test_labels, phase_modulation=False)
+                optimizer, train_imgs, train_labels, test_imgs, test_labels, phase_modulation=True)
             results[optimizer] = {
                 'weights': weights,
                 'bias': bias,
