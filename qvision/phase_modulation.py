@@ -1,6 +1,7 @@
 import numpy as np
 import collections
 from .utils import sig, sigPrime
+import matplotlib.pyplot as plt
 
 def amplitude(z):
     return np.abs(z)
@@ -8,25 +9,31 @@ def amplitude(z):
 def phase(z):
     return np.angle(z)
 
-def gerchberg_saxton(Source, Target, max_iterations=100, tolerance=1e-6):
+def gerchberg_saxton(Source, Target, max_iterations=100, tolerance=5.2e-17):
     A = np.fft.ifft2(Target)
 
-    for _ in range(max_iterations):
+    for i in range(max_iterations):
         B = amplitude(Source) * np.exp(1j * phase(A))
         C = np.fft.fft2(B)
         D = amplitude(Target) * np.exp(1j * phase(C))
         A = np.fft.ifft2(D)
+        A = amplitude(Source) * np.exp(1j * phase(A))
 
-        if np.linalg.norm(amplitude(A) - amplitude(Source)) < tolerance:
+        # Check for convergence
+        error = np.linalg.norm(amplitude(A) - amplitude(Source))
+        #print(f"Iteration {i}, Error: {error}")
+
+        if error < tolerance:
+            #print(f"Converged in {i} iterations with error {error}")
             break
 
     Retrieved_Phase = phase(A)
     return Retrieved_Phase
 
-def neuron(weights, bias, Img, num_shots, max_iterations=100, tolerance=1e-6):
+def neuron(weights, bias, Img, num_shots, max_iterations=100):
     Source = Img
     Target = weights
-    Retrieved_Phase = gerchberg_saxton(Source, Target, max_iterations, tolerance)
+    Retrieved_Phase = gerchberg_saxton(Source, Target, max_iterations)
     modulated_Img = Img * np.exp(1j * Retrieved_Phase)
     prob = np.abs(np.sum(modulated_Img * np.conj(weights)))**2
 
