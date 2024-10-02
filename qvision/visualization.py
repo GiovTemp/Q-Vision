@@ -9,31 +9,27 @@ def plot_loss_accuracy(
         test_loss_history,
         accuracy_history,
         test_accuracy_history,
-        figsize=(16, 7),
-        dpi=100,
-        font_size=14,
-        title_size=16,
-        label_size=14,
-        legend_size=12,
-        tick_size=12,
-        linewidth=2,
+        figsize=(18, 8),
+        dpi=150,
+        font_size=16,
+        title_size=20,
+        label_size=18,
+        legend_size=14,
+        tick_size=14,
+        linewidth=2.5,
         linestyle_train='-',
         linestyle_val='--',
         grid=True,
         style='whitegrid',
-        color_train='blue',
-        color_val='orange',
-        marker_train='o',
-        marker_val='s'
+        marker_train=None,  # Impostato a None per default senza marker
+        marker_val=None
 ):
     """
-    Plot the training and validation loss and accuracy with customizable quality and fonts.
+    Plot the training and validation loss and accuracy with enhanced quality and fonts.
 
     Additional Parameters:
-    - color_train: Color for training lines. Default is 'blue'.
-    - color_val: Color for validation lines. Default is 'orange'.
-    - marker_train: Marker style for training lines. Default is 'o'.
-    - marker_val: Marker style for validation lines. Default is 's'.
+    - marker_train: Marker style for training lines. Default is None.
+    - marker_val: Marker style for validation lines. Default is None.
     """
     # Imposta lo stile del grafico
     sns.set(style=style)
@@ -55,12 +51,10 @@ def plot_loss_accuracy(
 
     # Plot della loss
     plt.subplot(1, 2, 1)
-    plt.plot(epochs, loss_history, label='Training Loss',
-             linewidth=linewidth, linestyle=linestyle_train,
-             color=color_train, marker=marker_train)
-    plt.plot(epochs, test_loss_history, label='Validation Loss',
-             linewidth=linewidth, linestyle=linestyle_val,
-             color=color_val, marker=marker_val)
+    plt.plot(epochs, loss_history, label='Training Loss', linewidth=linewidth, linestyle=linestyle_train,
+             marker=marker_train)
+    plt.plot(epochs, test_loss_history, label='Validation Loss', linewidth=linewidth, linestyle=linestyle_val,
+             marker=marker_val)
     plt.xlabel('Epoche')
     plt.ylabel('Loss')
     plt.title('Training e Validation Loss')
@@ -70,12 +64,10 @@ def plot_loss_accuracy(
 
     # Plot dell'accuracy
     plt.subplot(1, 2, 2)
-    plt.plot(epochs, accuracy_history, label='Training Accuracy',
-             linewidth=linewidth, linestyle=linestyle_train,
-             color=color_train, marker=marker_train)
-    plt.plot(epochs, test_accuracy_history, label='Validation Accuracy',
-             linewidth=linewidth, linestyle=linestyle_val,
-             color=color_val, marker=marker_val)
+    plt.plot(epochs, accuracy_history, label='Training Accuracy', linewidth=linewidth, linestyle=linestyle_train,
+             marker=marker_train)
+    plt.plot(epochs, test_accuracy_history, label='Validation Accuracy', linewidth=linewidth, linestyle=linestyle_val,
+             marker=marker_val)
     plt.xlabel('Epoche')
     plt.ylabel('Accuracy')
     plt.title('Training e Validation Accuracy')
