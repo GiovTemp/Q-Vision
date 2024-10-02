@@ -309,9 +309,9 @@ def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivativ
     velocity_weights = momentum * velocity_weights + (1 - momentum) * lossWeightsDerivatives
     velocity_bias = momentum * velocity_bias + (1 - momentum) * lossBiasDerivatives
 
-    # Aggiorna i parametri (pesi e bias)
-    weights -= velocity_weights
-    bias -= velocity_bias
+    # Aggiorna i parametri applicando la learning rate
+    weights -= lrWeights * velocity_weights
+    bias -= lrBias * velocity_bias
 
     # Ritorna i pesi aggiornati, il bias aggiornato, e le velocità
     return weights, bias, {'velocity_weights': velocity_weights, 'velocity_bias': velocity_bias}
