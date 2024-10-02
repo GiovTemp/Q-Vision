@@ -304,9 +304,10 @@ def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivativ
     velocity_weights = cache.get('velocity_weights', np.zeros_like(weights))
     velocity_bias = cache.get('velocity_bias', np.zeros_like(bias))
 
-    # Aggiorna le velocità con il termine di momentum
-    velocity_weights = momentum * velocity_weights + lrWeights * lossWeightsDerivatives
-    velocity_bias = momentum * velocity_bias + lrBias * lossBiasDerivatives
+
+    # Aggiorna le velocità con il termine di momentum e il fattore (1 - momentum)
+    velocity_weights = momentum * velocity_weights + (1 - momentum) * lossWeightsDerivatives
+    velocity_bias = momentum * velocity_bias + (1 - momentum) * lossBiasDerivatives
 
     # Aggiorna i parametri (pesi e bias)
     weights -= velocity_weights
