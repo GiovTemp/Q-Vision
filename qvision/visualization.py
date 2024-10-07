@@ -68,7 +68,7 @@ def plot_loss_accuracy(
              marker=marker_train)
     plt.plot(epochs, test_accuracy_history, label='Validation Accuracy', linewidth=linewidth, linestyle=linestyle_val,
              marker=marker_val)
-    plt.xlabel('Epoche')
+    plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.title('Training e Validation Accuracy')
     plt.legend()
