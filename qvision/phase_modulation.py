@@ -1,6 +1,7 @@
 import numpy as np
 import collections
 from .utils import sig, sigPrime
+import math
 import matplotlib.pyplot as plt
 
 def amplitude(z):
@@ -9,33 +10,46 @@ def amplitude(z):
 def phase(z):
     return np.angle(z)
 
-def gerchberg_saxton(Source, Target, max_iterations=100, tolerance=5.2e-17):
-    A = np.fft.ifft2(Target)
+def gerchberg_saxton(Source, Target, max_iterations=1000, tolerance=0.35):
+
+    target_size = np.sqrt(Target.shape[0] * Target.shape[1])
+    A = np.fft.ifft2(Target) * target_size
 
     for i in range(max_iterations):
         B = amplitude(Source) * np.exp(1j * phase(A))
-        C = np.fft.fft2(B)
+        C = np.fft.fft2(B) / target_size
         D = amplitude(Target) * np.exp(1j * phase(C))
-        A = np.fft.ifft2(D)
-        A = amplitude(Source) * np.exp(1j * phase(A))
+        A = np.fft.ifft2(D) * target_size
 
         # Check for convergence
-        error = np.linalg.norm(amplitude(A) - amplitude(Source))
-        #print(f"Iteration {i}, Error: {error}")
+        error = np.linalg.norm(amplitude(C) - amplitude(Target))
+
+        # print(f'{i}: {error}')
 
         if error < tolerance:
-            #print(f"Converged in {i} iterations with error {error}")
             break
 
     Retrieved_Phase = phase(A)
-    return Retrieved_Phase
+    return B, C
 
 def neuron(weights, bias, Img, num_shots, max_iterations=100):
-    Source = Img
-    Target = weights
-    Retrieved_Phase = gerchberg_saxton(Source, Target, max_iterations)
-    modulated_Img = Img * np.exp(1j * Retrieved_Phase)
-    prob = np.abs(np.sum(modulated_Img * np.conj(weights)))**2
+
+    img_size = np.sqrt(Img.shape[0] * Img.shape[1])
+
+    Source = np.ones((Img.shape[0], Img.shape[1]))
+    Source = Source/np.linalg.norm(Source)
+    Target = Img/np.linalg.norm(Img)
+    _, modulated_image = gerchberg_saxton(Source, Target, max_iterations)
+    #modulated_Img = Img * np.exp(1j * Retrieved_Phase)
+    weights_phase = np.exp(2 * math.pi * 1j * weights)
+    weights_phase = weights_phase / np.linalg.norm(weights_phase)
+    weights2 = np.fft.fft2(weights_phase) / img_size
+    prob = (np.abs(np.sum(modulated_image * np.conj(weights2)))**2) / (np.linalg.norm(weights2) * np.linalg.norm(modulated_image))
+
+    # print('norma di modulated_image:', np.linalg.norm(modulated_image))
+    # print('norma di weights2:', np.linalg.norm(weights2))
+    #
+    # print('prob:', prob)
 
     if num_shots == -1:
         f = prob
@@ -46,8 +60,6 @@ def neuron(weights, bias, Img, num_shots, max_iterations=100):
     return sig(f + bias)
 
 def spatial_loss_derivative(output, target, weights, bias, Img):
-    """ Compute the derivative of the binary cross-entropy with respect to the
-        neuron parameters, with spatial-encoded input. """
     if output == 1:
         raise ValueError('Output is 1!')
     elif output <= 0:
@@ -59,14 +71,15 @@ def spatial_loss_derivative(output, target, weights, bias, Img):
     y = target
     norm = np.sqrt(np.sum(np.square(weights)))
 
-    Source = Img
-    Target = weights
-    Retrieved_Phase = gerchberg_saxton(Source, Target)
-    modulated_Img = Img * np.exp(1j * Retrieved_Phase)
-    # retrieved_weights = np.abs(modulated_Img)
+    Source = np.ones((Img.shape[0], Img.shape[1]))
+    Target = np.sqrt(Img)
+    source_image, modulated_image = gerchberg_saxton(Source, Target, 100)
+    #modulated_Img = Img * np.exp(1j * Retrieved_Phase)
+    weights2 = np.fft.fft2(np.exp(2 * math.pi * 1j * weights))
+    weights2 = weights2 / np.linalg.norm(weights2)
 
-    g = np.sum(np.multiply(modulated_Img, weights / norm))  # <I, U>
-    gPrime = (modulated_Img - g * weights / norm) / norm  # <I, dlambdaU>
+    g = np.sum(np.multiply(modulated_image, weights2))  # <I, U>
+    gPrime = -2 * math.pi * 1j * np.multiply(weights, np.exp(1j * (phase(source_image)-2 * math.pi * weights))) # <I, dlambdaU>
 
     fPrime = 2 * np.real(g * np.conjugate(gPrime))  # 2Re[<I, U><I, dU>*]
 
@@ -80,8 +93,6 @@ def spatial_loss_derivative(output, target, weights, bias, Img):
     return weights_derivative, bias_derivative
 
 def Fourier_loss_derivative(output, target, weights, bias, Img):
-    """ Compute the derivative of the binary cross-entropy with respect to the
-        neuron parameters, with Fourier-encoded input. """
     if output == 1:
         raise ValueError('Output is 1!')
     elif output <= 0:
