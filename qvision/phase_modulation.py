@@ -32,19 +32,24 @@ def gerchberg_saxton(Source, Target, max_iterations=1000, tolerance=0.35):
     Retrieved_Phase = phase(A)
     return B, C
 
-def neuron(weights, bias, Img, num_shots, max_iterations=100):
+def neuron(weights, bias, Img, modulated_image, num_shots, max_iterations=100):
 
-    img_size = np.sqrt(Img.shape[0] * Img.shape[1])
+    # Source = np.ones((Img.shape[0], Img.shape[1]))
+    # Source = Source/np.linalg.norm(Source)
+    # Target = np.sqrt(Img)
+    # Target = Target / np.linalg.norm(Target)
 
-    Source = np.ones((Img.shape[0], Img.shape[1]))
-    Source = Source/np.linalg.norm(Source)
-    Target = Img/np.linalg.norm(Img)
-    _, modulated_image = gerchberg_saxton(Source, Target, max_iterations)
-    #modulated_Img = Img * np.exp(1j * Retrieved_Phase)
+    # _, modulated_image = gerchberg_saxton(Source, Target, max_iterations)
+    modulated_image = modulated_image / np.linalg.norm(modulated_image)
+
     weights_phase = np.exp(2 * math.pi * 1j * weights)
     weights_phase = weights_phase / np.linalg.norm(weights_phase)
-    weights2 = np.fft.fft2(weights_phase) / img_size
-    prob = (np.abs(np.sum(modulated_image * np.conj(weights2)))**2) / (np.linalg.norm(weights2) * np.linalg.norm(modulated_image))
+
+    weights2 = np.fft.fft2(weights_phase)
+    weights2 = weights2 / np.linalg.norm(weights2)
+    prob = (np.abs(np.sum(modulated_image * np.conj(weights2)))**2)
+
+    #print('prob:', prob)
 
     # print('norma di modulated_image:', np.linalg.norm(modulated_image))
     # print('norma di weights2:', np.linalg.norm(weights2))
@@ -59,7 +64,7 @@ def neuron(weights, bias, Img, num_shots, max_iterations=100):
         f = counter[1]/num_shots
     return sig(f + bias)
 
-def spatial_loss_derivative(output, target, weights, bias, Img):
+def spatial_loss_derivative(output, target, source_image, modulated_image, weights, bias, Img):
     if output == 1:
         raise ValueError('Output is 1!')
     elif output <= 0:
@@ -71,15 +76,24 @@ def spatial_loss_derivative(output, target, weights, bias, Img):
     y = target
     norm = np.sqrt(np.sum(np.square(weights)))
 
-    Source = np.ones((Img.shape[0], Img.shape[1]))
-    Target = np.sqrt(Img)
-    source_image, modulated_image = gerchberg_saxton(Source, Target, 100)
-    #modulated_Img = Img * np.exp(1j * Retrieved_Phase)
+    img_size = np.sqrt(Img.shape[0] * Img.shape[1])
+
+    # Source = np.ones((Img.shape[0], Img.shape[1]))
+    # Source = Source/np.linalg.norm(Source)
+    # Target = np.sqrt(Img)
+    # Target = Target / np.linalg.norm(Target)
+
+    # source_image, modulated_image = gerchberg_saxton(Source, Target, 1000)
+    modulated_image = modulated_image / np.linalg.norm(modulated_image)
+
+    weights_phase = np.exp(2 * math.pi * 1j * weights)
+    weights_phase = weights_phase / np.linalg.norm(weights_phase)
+
     weights2 = np.fft.fft2(np.exp(2 * math.pi * 1j * weights))
     weights2 = weights2 / np.linalg.norm(weights2)
 
-    g = np.sum(np.multiply(modulated_image, weights2))  # <I, U>
-    gPrime = -2 * math.pi * 1j * np.multiply(weights, np.exp(1j * (phase(source_image)-2 * math.pi * weights))) # <I, dlambdaU>
+    g = np.sum(np.multiply(modulated_image, np.conj(weights2)))  # <I, U>
+    gPrime = -2 * math.pi * 1j * np.multiply(source_image, np.conj(weights_phase)) * img_size**2 # <I, dlambdaU>
 
     fPrime = 2 * np.real(g * np.conjugate(gPrime))  # 2Re[<I, U><I, dU>*]
 

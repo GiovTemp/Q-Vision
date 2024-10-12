@@ -51,14 +51,15 @@ class QVision:
         test_imgs = calculate_amplitudes(test_imgs)
         return train_imgs, train_labels, test_imgs, test_labels
 
-    def train(self, optimizer_name, train_imgs, train_labels, test_imgs, test_labels, phase_modulation=False):
+    def train(self, optimizer_name, train_imgs, train_labels, test_imgs, test_labels, train_source_images, train_modulated_images, train_labels1,
+          test_source_images, test_modulated_images, test_labels1, phase_modulation=False):
         self.weights, self.bias, self.loss_history, self.test_loss_history, self.accuracy_history, self.test_accuracy_history = train(
-            optimizer_name, self.weights, self.bias, train_imgs, train_labels, test_imgs, test_labels, self.num_epochs,
-            self.lr_weights, self.lr_bias, self.num_shots, phase_modulation, self.momentum, self.batch_size)
+            optimizer_name, self.weights, self.bias, train_imgs, train_labels, test_imgs, test_labels, train_source_images, train_modulated_images, train_labels1,
+          test_source_images, test_modulated_images, test_labels1, self.num_epochs, self.lr_weights, self.lr_bias, self.num_shots, phase_modulation, self.momentum, self.batch_size)
         return self.weights, self.bias, self.loss_history, self.test_loss_history, self.accuracy_history, self.test_accuracy_history
 
     @staticmethod
-    def initialize_weights(shape, low=0.0, high=1.0):
+    def initialize_weights(shape, low=-0.5, high=0.5):
         """Initialize weights with a uniform distribution."""
         return np.random.uniform(low, high, shape)
 

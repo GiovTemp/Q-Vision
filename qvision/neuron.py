@@ -155,22 +155,32 @@ def Fourier_loss_derivative(output, target, weights, bias, Img):
 #     return weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history
 
 
-def optimizer(optimizer_function, loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs,
-              num_epochs, lrWeights, lrBias, num_shots, momentum, batch_size, phase_modulation, **kwargs):
+def optimizer(optimizer_function, loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs, lrWeights, lrBias, num_shots, momentum, batch_size, phase_modulation, **kwargs):
     if optimizer_function == 'gd':
-        return optimization_standard_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, phase_modulation, **kwargs)
+        return optimization_standard_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs, lrWeights, lrBias, num_shots, phase_modulation, **kwargs)
     elif optimizer_function == 'sgd':
-        return optimization_sgd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, phase_modulation, **kwargs)
+        return optimization_sgd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs, lrWeights, lrBias, num_shots, phase_modulation, **kwargs)
     elif optimizer_function == 'sgd_momentum':
-        return optimization_sgd_momentum(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, phase_modulation, momentum, **kwargs)
+        return optimization_sgd_momentum(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs, lrWeights, lrBias, num_shots, phase_modulation, momentum, **kwargs)
     elif optimizer_function == 'mini_batch_gd':
-        return optimization_minibatch_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, phase_modulation, batch_size, **kwargs)
+        return optimization_minibatch_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs, lrWeights, lrBias, num_shots, phase_modulation, batch_size, **kwargs)
 
 def common_optimization(
-    loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+    loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs,
     lrWeights, lrBias, num_shots, phase_modulation, update_fn: Callable, **kwargs
 ):
     """Common optimization loop with handling for complex numbers due to phase modulation."""
+
+    print('train_labels:', train_labels)
+    print('train labels:', train_labels)
+    print('target test:', test_labels)
+    print('test labels:', test_labels)
 
     # History initialization
     loss_history = []
@@ -189,22 +199,22 @@ def common_optimization(
     # Initial outputs and losses
     if phase_modulation:
         initial_outputs = np.array([
-            neuron_phase_modulation(weights, bias, trainImgs[idx, :, :], num_shots)
+            neuron_phase_modulation(weights, bias, trainImgs[idx, :, :], train_modulated_images[idx, :, :], num_shots)
             for idx in range(trainImgs.shape[0])
         ], dtype=np.complex128)  # Ensure complex data type
 
         initial_losses = np.array([
-            loss(np.abs(initial_outputs[idx]), targets[idx])  # Use magnitude for loss
+            loss(np.abs(initial_outputs[idx]), train_labels[idx])  # Use magnitude for loss
             for idx in range(initial_outputs.shape[0])
         ])
 
         initial_test_outputs = np.array([
-            neuron_phase_modulation(weights, bias, testImgs[idx, :, :], num_shots)
+            neuron_phase_modulation(weights, bias, testImgs[idx, :, :], train_modulated_images[idx, :, :], num_shots)
             for idx in range(testImgs.shape[0])
         ], dtype=np.complex128)
 
         initial_test_losses = np.array([
-            loss(np.abs(initial_test_outputs[idx]), test_targets[idx])  # Use magnitude for loss
+            loss(np.abs(initial_test_outputs[idx]), test_labels[idx])  # Use magnitude for loss
             for idx in range(initial_test_outputs.shape[0])
         ])
     else:
@@ -214,7 +224,7 @@ def common_optimization(
         ])
 
         initial_losses = np.array([
-            loss(initial_outputs[idx], targets[idx])
+            loss(initial_outputs[idx], train_labels[idx])
             for idx in range(initial_outputs.shape[0])
         ])
 
@@ -224,16 +234,16 @@ def common_optimization(
         ])
 
         initial_test_losses = np.array([
-            loss(initial_test_outputs[idx], test_targets[idx])
+            loss(initial_test_outputs[idx], test_labels[idx])
             for idx in range(initial_test_outputs.shape[0])
         ])
 
     # Store initial loss and accuracy
     loss_history.append(np.mean(initial_losses))
-    accuracy_history.append(accuracy(initial_outputs, targets))
+    accuracy_history.append(accuracy(initial_outputs, train_labels))
 
     test_loss_history = [np.mean(initial_test_losses)]
-    test_accuracy_history = [accuracy(initial_test_outputs, test_targets)]
+    test_accuracy_history = [accuracy(initial_test_outputs, test_labels)]
 
     print('Loss', loss_history[0], 'Val_Loss', test_loss_history[0])
     print('Accuracy', accuracy_history[0], 'Val_Acc', test_accuracy_history[0])
@@ -244,7 +254,7 @@ def common_optimization(
             # No shuffle for standard GD
             if phase_modulation:
                 outputs = np.array([
-                    neuron_phase_modulation(weights, bias, trainImgs[idx, :, :], num_shots)
+                    neuron_phase_modulation(weights, bias, trainImgs[idx, :, :], train_modulated_images[idx, :, :], num_shots)
                     for idx in range(trainImgs.shape[0])
                 ], dtype=np.complex128)
 
@@ -255,13 +265,13 @@ def common_optimization(
                 ])
 
             # Calculate losses using the magnitude of the complex outputs
-            losses = np.array([loss(np.abs(outputs[idx]), targets[idx]) for idx in range(outputs.shape[0])])
+            losses = np.array([loss(np.abs(outputs[idx]), train_labels[idx]) for idx in range(outputs.shape[0])])
             lossWeightsDerivatives = np.array([
-                np.atleast_1d(loss_derivative(np.abs(outputs[idx]), targets[idx], weights, bias, trainImgs[idx, :, :])[0])
+                np.atleast_1d(loss_derivative(np.abs(outputs[idx]), train_labels[idx], train_source_images[idx, :, :], train_modulated_images[idx, :, :], weights, bias, trainImgs[idx, :, :])[0])
                 for idx in range(trainImgs.shape[0])
             ])
             lossBiasDerivatives = np.array([
-                np.atleast_1d(loss_derivative(np.abs(outputs[idx]), targets[idx], weights, bias, trainImgs[idx, :, :])[1])
+                np.atleast_1d(loss_derivative(np.abs(outputs[idx]), train_labels[idx], train_source_images[idx, :, :], train_modulated_images[idx, :, :], weights, bias, trainImgs[idx, :, :])[1])
                 for idx in range(trainImgs.shape[0])
             ])
 
@@ -288,13 +298,13 @@ def common_optimization(
                 # Iterate over samples in the current batch
                 for idx in batch_indices:
                     if phase_modulation:
-                        output = neuron_phase_modulation(weights, bias, trainImgs[idx, :, :], num_shots)
+                        output = neuron_phase_modulation(weights, bias, trainImgs[idx, :, :], train_modulated_images[idx, :, :], num_shots)
                     else:
                         output = neuron(weights, bias, trainImgs[idx, :, :], num_shots)
 
                     # Use magnitude for loss derivative calculations
                     lossWeightDerivative, lossBiasDerivative = loss_derivative(
-                        np.abs(output), targets[idx], weights, bias, trainImgs[idx, :, :]
+                        np.abs(output), train_labels[idx], train_source_images[idx, :, :], train_modulated_images[idx, :, :], weights, bias, trainImgs[idx, :, :]
                     )
 
                     batch_lossWeightDerivatives.append(lossWeightDerivative)
@@ -324,7 +334,7 @@ def common_optimization(
         # After each epoch, calculate losses and accuracy
         if phase_modulation:
             outputs = np.array([
-                neuron_phase_modulation(weights, bias, trainImgs[idx, :, :], num_shots)
+                neuron_phase_modulation(weights, bias, trainImgs[idx, :, :], train_modulated_images[idx, :, :], num_shots)
                 for idx in range(trainImgs.shape[0])
             ], dtype=np.complex128)
         else:
@@ -334,14 +344,14 @@ def common_optimization(
             ])
 
         # Calculate losses using the magnitude of the outputs
-        losses = np.array([loss(np.abs(outputs[idx]), targets[idx]) for idx in range(outputs.shape[0])])
+        losses = np.array([loss(np.abs(outputs[idx]), train_labels[idx]) for idx in range(outputs.shape[0])])
         loss_history.append(np.mean(losses))
 
-        accuracy_history.append(accuracy(outputs, targets))
+        accuracy_history.append(accuracy(outputs, train_labels))
 
         if phase_modulation:
             test_outputs = np.array([
-                neuron_phase_modulation(weights, bias, testImgs[idx, :, :], num_shots)
+                neuron_phase_modulation(weights, bias, testImgs[idx, :, :], test_modulated_images[idx, :, :], num_shots)
                 for idx in range(testImgs.shape[0])
             ], dtype=np.complex128)
         else:
@@ -351,9 +361,9 @@ def common_optimization(
             ])
 
         # Calculate test losses using the magnitude of the outputs
-        test_losses = np.array([loss(np.abs(test_outputs[idx]), test_targets[idx]) for idx in range(test_outputs.shape[0])])
+        test_losses = np.array([loss(np.abs(test_outputs[idx]), test_labels[idx]) for idx in range(test_outputs.shape[0])])
         test_loss_history.append(np.mean(test_losses))
-        test_accuracy_history.append(accuracy(test_outputs, test_targets))
+        test_accuracy_history.append(accuracy(test_outputs, test_labels))
 
         print('EPOCH', epoch + 1)
         print('Loss', loss_history[epoch + 1], 'Val_Loss', test_loss_history[epoch + 1])
@@ -404,38 +414,46 @@ def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivativ
     return weights, bias, {'velocity_weights': velocity_weights, 'velocity_bias': velocity_bias}
 
 def optimization_standard_gd(
-        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs,
         lrWeights, lrBias, num_shots, phase_modulation, **kwargs
 ):
     return common_optimization(
-        loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+        loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs,
         lrWeights, lrBias, num_shots, phase_modulation, standard_gd_update, **kwargs
     )
 
 def optimization_sgd(
-        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs,
         lrWeights, lrBias, num_shots, phase_modulation, **kwargs
 ):
     return common_optimization(
-        loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+        loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs,
         lrWeights, lrBias, num_shots, phase_modulation, sgd_update, batch_size=1, **kwargs
     )
 
 def optimization_sgd_momentum(
-        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs,
         lrWeights, lrBias, num_shots, phase_modulation, momentum, **kwargs
 ):
     return common_optimization(
-        loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+        loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs,
         lrWeights, lrBias, num_shots, phase_modulation, sgd_momentum_update, momentum=momentum, batch_size=1, **kwargs
     )
 
 def optimization_minibatch_gd(
-        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs,
         lrWeights, lrBias, num_shots, phase_modulation, batch_size, **kwargs
 ):
     return common_optimization(
-        loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+        loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,
+          test_source_images, test_modulated_images, test_labels, num_epochs,
         lrWeights, lrBias, num_shots, phase_modulation, standard_gd_update, batch_size=batch_size, **kwargs
     )
 
