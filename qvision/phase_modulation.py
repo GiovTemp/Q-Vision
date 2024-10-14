@@ -47,7 +47,7 @@ def neuron(weights, bias, Img, modulated_image, num_shots, max_iterations=100):
 
     weights2 = np.fft.fft2(weights_phase)
     weights2 = weights2 / np.linalg.norm(weights2)
-    prob = (np.abs(np.sum(modulated_image * np.conj(weights2)))**2)
+    prob = np.abs(np.sum(np.multiply(modulated_image, np.conj(weights2))))**2
 
     #print('prob:', prob)
 

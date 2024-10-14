@@ -46,8 +46,7 @@ def process_and_save_images(images, labels, folder_prefix):
         # Using the same image as Source and Target for simplicity
         Source = np.ones((image.shape[0], image.shape[1]))
         Source = Source/np.linalg.norm(Source)
-        Target = np.sqrt(image)
-        Target = Target / np.linalg.norm(Target)
+        Target = image
         # Apply Gerchberg-Saxton algorithm
         B, C = gerchberg_saxton(Source, Target)
 
