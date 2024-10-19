@@ -171,7 +171,7 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
             Tpr = 0.5  # Trasmissibilità
             Tob = 0.5
             delta_T = 4 * non_ideal_parameters.get('C', 0.0)
-            P = calculate_photon_flow_pairs(Img, delta_T)  # Calcolo del flusso di coppia
+            P = non_ideal_parameters.get('P', 0.0)
             Rate = P / 4
             N_p = 1
         else:
@@ -181,9 +181,9 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
             Tob = calculate_transmissibility(Img)  # Calcolo della trasmissibilità
             Tpr = calculate_transmissibility(Probe)  # Calcolo della trasmissibilità del probe
             delta_T = non_ideal_parameters.get('C', 0.0) / Tob * Tpr  # Calcolo di delta_T
-            P = calculate_photon_flow_pairs(Img, delta_T)  # Calcolo del flusso di coppia
+            P = non_ideal_parameters.get('P', 0.0)  # Calcolo del flusso di coppia
             Rate = P * Tob * Tpr  # Calcolo del rate
-            N_p = 100  # Numero di ripetizioni
+            N_p = 1  # Numero di ripetizioni
 
         # Chiamata alla funzione coinc per ottenere N_m
         N_m, _, _, _, _ = coinc(f, Rate, eta, tau, delta_T, N_p=N_p, Rifl=0.5)

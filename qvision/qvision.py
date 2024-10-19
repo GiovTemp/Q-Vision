@@ -24,9 +24,11 @@ class QVision:
         self.ideal_conditions = ideal_conditions
         self.non_ideal_parameters = {
             'C': 0.0,  # iperparmetro per delta T
-            'eta': 0.0,  # vettore efficienza dei detector, ovvero rapporto fra il numero di fotoni rilevati sul numero di fotoni incidenti
+            'eta': 0.0,
+            # vettore efficienza dei detector, ovvero rapporto fra il numero di fotoni rilevati sul numero di fotoni incidenti
             'tau': 0.0,  # vettore durata del tempo morto per i due detector (sec.)
-            'drc': 0.0  # maanca
+            'drc': 0.0,  # manca nella funzione coinc
+            'P': 0.0  #flusso di coppia dei fotoni espresso in Hz
         }
 
     def set_hyperparameters(self, num_epochs=None, lr_weights=None, lr_bias=None, num_shots=None, momentum=None,
@@ -81,7 +83,8 @@ class QVision:
     def train(self, optimizer_name, train_imgs, train_labels, test_imgs, test_labels):
         self.weights, self.bias, self.loss_history, self.test_loss_history, self.accuracy_history, self.test_accuracy_history = train(
             optimizer_name, self.weights, self.bias, train_imgs, train_labels, test_imgs, test_labels, self.num_epochs,
-            self.lr_weights, self.lr_bias, self.num_shots, self.momentum, self.batch_size, self.ideal_conditions, self.non_ideal_parameters)
+            self.lr_weights, self.lr_bias, self.num_shots, self.momentum, self.batch_size, self.ideal_conditions,
+            self.non_ideal_parameters)
         return self.weights, self.bias, self.loss_history, self.test_loss_history, self.accuracy_history, self.test_accuracy_history
 
     @staticmethod
