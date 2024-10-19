@@ -5,21 +5,28 @@ import numpy as np
 from typing import Callable, Tuple
 
 from .utils import sig, sigPrime, loss, accuracy
+from .photon_detector import calculate_f_i
 
-def neuron(weights, bias, Img, num_shots):
+
+def neuron(weights, bias, Img, num_shots, ideal_conditions, non_ideal_parameters):
     """ Compute the output of the quantum optical neuron, with parameters
         weights and bias, and input Img. The predicted probability is sampled
         for a given number of shots (deactived by choosing shots = -1). """
+
     norm = np.sqrt(np.sum(np.square(weights)))
-    prob = np.abs(np.sum(np.multiply(Img, weights/norm)))**2
+    prob = np.abs(np.sum(np.multiply(Img, weights / norm))) ** 2
     # Sampling (1: Coincidence)
     if num_shots == -1:
         f = prob
+        f_i = calculate_f_i(weights, Img, 1, ideal_conditions, non_ideal_parameters, f)
     else:
         samples = np.random.choice([0, 1], num_shots, p=[1 - prob, prob])
         counter = collections.Counter(samples)
-        f = counter[1]/num_shots
-    return sig(f + bias)
+        f = counter[1] / num_shots
+        f_i = calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameters, f)
+
+    return sig(f_i + bias)
+
 
 def spatial_loss_derivative(output, target, weights, bias, Img):
     """ Compute the derivative of the binary cross-entropy with respect to the
@@ -38,20 +45,21 @@ def spatial_loss_derivative(output, target, weights, bias, Img):
     norm = np.sqrt(np.sum(np.square(weights)))
 
     # Compute the derivative with respect to the weights
-    g = np.sum(np.multiply(Img, weights/norm)) # <I, U>
-    gPrime = (Img - g*weights/norm)/norm # <I, dlambdaU>
+    g = np.sum(np.multiply(Img, weights / norm))  # <I, U>
+    gPrime = (Img - g * weights / norm) / norm  # <I, dlambdaU>
 
-    fPrime = 2*np.real(g*np.conjugate(gPrime)) # 2Re[<I, U><I, dU>*]
+    fPrime = 2 * np.real(g * np.conjugate(gPrime))  # 2Re[<I, U><I, dU>*]
 
-    crossPrime = (F - y)/(F*(1-F))
+    crossPrime = (F - y) / (F * (1 - F))
 
-    gAbs = np.abs(g) # sqrt(f)
-    weights_derivative = crossPrime*sigPrime(gAbs**2 + bias)*fPrime
+    gAbs = np.abs(g)  # sqrt(f)
+    weights_derivative = crossPrime * sigPrime(gAbs ** 2 + bias) * fPrime
 
     # Compute the derivative with respect to the bias
-    bias_derivative = crossPrime*sigPrime(gAbs**2 + bias)
+    bias_derivative = crossPrime * sigPrime(gAbs ** 2 + bias)
 
     return weights_derivative, bias_derivative
+
 
 def Fourier_loss_derivative(output, target, weights, bias, Img):
     """ Compute the derivative of the binary cross-entropy with respect to the
@@ -70,20 +78,21 @@ def Fourier_loss_derivative(output, target, weights, bias, Img):
     norm = np.sqrt(np.sum(np.square(weights)))
 
     # Compute the derivative with respect to the weights
-    g = np.sum(np.multiply(Img, weights/norm)) # <I, U>
-    gAbs = np.abs(g) # sqrt(f)
+    g = np.sum(np.multiply(Img, weights / norm))  # <I, U>
+    gAbs = np.abs(g)  # sqrt(f)
 
-    gPrime = (Img - gAbs*weights/norm)/norm # Approximation
-    fPrime = 2*np.real(gAbs*np.conjugate(gPrime)) # Approximation
+    gPrime = (Img - gAbs * weights / norm) / norm  # Approximation
+    fPrime = 2 * np.real(gAbs * np.conjugate(gPrime))  # Approximation
 
-    crossPrime = (F - y)/(F*(1-F))
+    crossPrime = (F - y) / (F * (1 - F))
 
-    weights_derivative = crossPrime*sigPrime(gAbs**2 + bias)*fPrime
+    weights_derivative = crossPrime * sigPrime(gAbs ** 2 + bias) * fPrime
 
     # Compute the derivative with respect to the bias
-    bias_derivative = crossPrime*sigPrime(gAbs**2 + bias)
+    bias_derivative = crossPrime * sigPrime(gAbs ** 2 + bias)
 
     return weights_derivative, bias_derivative
+
 
 # def update_rule(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias):
 #     """ Parameters update rule of the gradient descent algorithm. """
@@ -155,19 +164,29 @@ def Fourier_loss_derivative(output, target, weights, bias, Img):
 
 
 def optimizer(optimizer_function, loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs,
-              num_epochs, lrWeights, lrBias, num_shots, momentum, batch_size, **kwargs):
+              num_epochs, lrWeights, lrBias, num_shots, momentum, batch_size, ideal_conditions, non_ideal_parameters,
+              **kwargs):
     if optimizer_function == 'gd':
-        return optimization_standard_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, **kwargs)
+        return optimization_standard_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs,
+                                        num_epochs, lrWeights, lrBias, num_shots, ideal_conditions,
+                                        non_ideal_parameters, **kwargs)
     elif optimizer_function == 'sgd':
-        return optimization_sgd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, **kwargs)
+        return optimization_sgd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+                                lrWeights, lrBias, num_shots, ideal_conditions, non_ideal_parameters, **kwargs)
     elif optimizer_function == 'sgd_momentum':
-        return optimization_sgd_momentum(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, momentum, **kwargs)
+        return optimization_sgd_momentum(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs,
+                                         num_epochs, lrWeights, lrBias, num_shots, momentum, ideal_conditions,
+                                         non_ideal_parameters, **kwargs)
     elif optimizer_function == 'mini_batch_gd':
-        return optimization_minibatch_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, lrWeights, lrBias, num_shots, batch_size, **kwargs)
+        return optimization_minibatch_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs,
+                                         num_epochs, lrWeights, lrBias, num_shots, batch_size, ideal_conditions,
+                                         non_ideal_parameters,
+                                         **kwargs)
+
 
 def common_optimization(
-    loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-    lrWeights, lrBias, num_shots, update_fn: Callable, **kwargs
+        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+        lrWeights, lrBias, num_shots, update_fn: Callable, ideal_conditions, non_ideal_parameters, **kwargs
 ):
     """Common optimization loop."""
     # History initialization
@@ -183,10 +202,15 @@ def common_optimization(
 
     # Verbose initial values
     print('EPOCH', 0)
-    initial_outputs = np.array([neuron(weights, bias, trainImgs[idx, :, :], num_shots) for idx in range(trainImgs.shape[0])])
+    initial_outputs = np.array(
+        [neuron(weights, bias, trainImgs[idx, :, :], num_shots, ideal_conditions, non_ideal_parameters) for idx in
+         range(trainImgs.shape[0])])
     initial_losses = np.array([loss(initial_outputs[idx], targets[idx]) for idx in range(initial_outputs.shape[0])])
-    initial_test_outputs = np.array([neuron(weights, bias, testImgs[idx, :, :], num_shots) for idx in range(testImgs.shape[0])])
-    initial_test_losses = np.array([loss(initial_test_outputs[idx], test_targets[idx]) for idx in range(initial_test_outputs.shape[0])])
+    initial_test_outputs = np.array(
+        [neuron(weights, bias, testImgs[idx, :, :], num_shots, ideal_conditions, non_ideal_parameters) for idx in
+         range(testImgs.shape[0])])
+    initial_test_losses = np.array(
+        [loss(initial_test_outputs[idx], test_targets[idx]) for idx in range(initial_test_outputs.shape[0])])
 
     loss_history.append(np.mean(initial_losses))
     accuracy_history.append(accuracy(initial_outputs, targets))
@@ -201,10 +225,17 @@ def common_optimization(
     for epoch in range(num_epochs):
         if update_fn == standard_gd_update:
             # No shuffle for standard GD
-            outputs = np.array([neuron(weights, bias, trainImgs[idx, :, :], num_shots) for idx in range(trainImgs.shape[0])])
+            outputs = np.array(
+                [neuron(weights, bias, trainImgs[idx, :, :], num_shots, ideal_conditions, non_ideal_parameters) for idx
+                 in
+                 range(trainImgs.shape[0])])
             losses = np.array([loss(outputs[idx], targets[idx]) for idx in range(outputs.shape[0])])
-            lossWeightsDerivatives = np.array([np.atleast_1d(loss_derivative(outputs[idx], targets[idx], weights, bias, trainImgs[idx, :, :])[0]) for idx in range(trainImgs.shape[0])])
-            lossBiasDerivatives = np.array([np.atleast_1d(loss_derivative(outputs[idx], targets[idx], weights, bias, trainImgs[idx, :, :])[1]) for idx in range(trainImgs.shape[0])])
+            lossWeightsDerivatives = np.array(
+                [np.atleast_1d(loss_derivative(outputs[idx], targets[idx], weights, bias, trainImgs[idx, :, :])[0]) for
+                 idx in range(trainImgs.shape[0])])
+            lossBiasDerivatives = np.array(
+                [np.atleast_1d(loss_derivative(outputs[idx], targets[idx], weights, bias, trainImgs[idx, :, :])[1]) for
+                 idx in range(trainImgs.shape[0])])
 
             mean_lossWeightsDerivatives = np.mean(lossWeightsDerivatives, axis=0)
             mean_lossBiasDerivatives = np.mean(lossBiasDerivatives, axis=0)
@@ -228,8 +259,10 @@ def common_optimization(
 
                 # Iterate over samples in the current batch
                 for idx in batch_indices:
-                    output = neuron(weights, bias, trainImgs[idx, :, :], num_shots)
-                    lossWeightDerivative, lossBiasDerivative = loss_derivative(output, targets[idx], weights, bias, trainImgs[idx, :, :])
+                    output = neuron(weights, bias, trainImgs[idx, :, :], num_shots, ideal_conditions,
+                                    non_ideal_parameters)
+                    lossWeightDerivative, lossBiasDerivative = loss_derivative(output, targets[idx], weights, bias,
+                                                                               trainImgs[idx, :, :])
 
                     batch_lossWeightDerivatives.append(lossWeightDerivative)
                     batch_lossBiasDerivatives.append(lossBiasDerivative)
@@ -248,21 +281,27 @@ def common_optimization(
                 # Update weights depending on the update function (SGD, momentum, or standard GD)
                 if update_fn == sgd_momentum_update:
                     weights, bias, cache = update_fn(
-                        weights, bias, mean_lossWeightDerivatives, mean_lossBiasDerivatives, lrWeights, lrBias, cache, momentum=momentum, **filtered_kwargs
+                        weights, bias, mean_lossWeightDerivatives, mean_lossBiasDerivatives, lrWeights, lrBias, cache,
+                        momentum=momentum, **filtered_kwargs
                     )
                 else:
                     weights, bias, cache = update_fn(
-                        weights, bias, mean_lossWeightDerivatives, mean_lossBiasDerivatives, lrWeights, lrBias, cache, **filtered_kwargs
+                        weights, bias, mean_lossWeightDerivatives, mean_lossBiasDerivatives, lrWeights, lrBias, cache,
+                        **filtered_kwargs
                     )
 
         # After each epoch, calculate losses and accuracy
-        outputs = np.array([neuron(weights, bias, trainImgs[idx, :, :], num_shots) for idx in range(trainImgs.shape[0])])
+        outputs = np.array(
+            [neuron(weights, bias, trainImgs[idx, :, :], num_shots, ideal_conditions, non_ideal_parameters) for idx in
+             range(trainImgs.shape[0])])
         losses = np.array([loss(outputs[idx], targets[idx]) for idx in range(outputs.shape[0])])
         loss_history.append(np.mean(losses))
 
         accuracy_history.append(accuracy(outputs, targets))
 
-        test_outputs = np.array([neuron(weights, bias, testImgs[idx, :, :], num_shots) for idx in range(testImgs.shape[0])])
+        test_outputs = np.array(
+            [neuron(weights, bias, testImgs[idx, :, :], num_shots, ideal_conditions, non_ideal_parameters) for idx in
+             range(testImgs.shape[0])])
         test_losses = np.array([loss(test_outputs[idx], test_targets[idx]) for idx in range(test_outputs.shape[0])])
         test_loss_history.append(np.mean(test_losses))
         test_accuracy_history.append(accuracy(test_outputs, test_targets))
@@ -273,6 +312,8 @@ def common_optimization(
         print('---')
 
     return weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history
+
+
 # Define the standard gradient descent update function
 def standard_gd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache):
     """ Parameters update rule of the gradient descent algorithm. """
@@ -287,6 +328,7 @@ def sgd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWei
     bias -= lrBias * lossBiasDerivatives
     return weights, bias, cache
 
+
 # def minibatch_gd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, batch_size):
 #     """ Update rule for Mini-Batch Gradient Descent (MBGD) """
 #     # Qui calcoliamo la media su ciascun mini-batch
@@ -294,7 +336,8 @@ def sgd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWei
 #     new_bias = bias - lrBias * np.mean(lossBiasDerivatives, axis=0)
 #     return new_weights, new_bias, cache
 
-def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, momentum=0.9):
+def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache,
+                        momentum=0.9):
     """ Update rule for Stochastic Gradient Descent (SGD) with Momentum """
     # Assicurati che le derivate siano trattate come array di almeno 1D
     lossWeightsDerivatives = np.atleast_1d(lossWeightsDerivatives)
@@ -303,7 +346,6 @@ def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivativ
     # Recupera le velocità dai valori precedenti
     velocity_weights = cache.get('velocity_weights', np.zeros_like(weights))
     velocity_bias = cache.get('velocity_bias', np.zeros_like(bias))
-
 
     # Aggiorna le velocità con il termine di momentum e il fattore (1 - momentum)
     velocity_weights = momentum * velocity_weights + (1 - momentum) * lossWeightsDerivatives
@@ -316,40 +358,45 @@ def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivativ
     # Ritorna i pesi aggiornati, il bias aggiornato, e le velocità
     return weights, bias, {'velocity_weights': velocity_weights, 'velocity_bias': velocity_bias}
 
+
 def optimization_standard_gd(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, **kwargs
+        lrWeights, lrBias, num_shots, ideal_conditions, non_ideal_parameters, **kwargs
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, standard_gd_update, **kwargs
+        lrWeights, lrBias, num_shots, standard_gd_update, ideal_conditions, non_ideal_parameters, **kwargs
     )
+
 
 def optimization_sgd(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, **kwargs
+        lrWeights, lrBias, num_shots, ideal_conditions, non_ideal_parameters, **kwargs
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, sgd_update, batch_size=1, **kwargs
+        lrWeights, lrBias, num_shots, sgd_update, ideal_conditions, non_ideal_parameters,
+        batch_size=1, **kwargs
     )
+
 
 def optimization_sgd_momentum(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, momentum, **kwargs
+        lrWeights, lrBias, num_shots, momentum, ideal_conditions, non_ideal_parameters, **kwargs
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, sgd_momentum_update, momentum=momentum, batch_size=1, **kwargs
+        lrWeights, lrBias, num_shots, sgd_momentum_update, ideal_conditions, non_ideal_parameters,
+        momentum=momentum, batch_size=1, **kwargs
     )
+
 
 def optimization_minibatch_gd(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, batch_size, **kwargs
+        lrWeights, lrBias, num_shots, batch_size, ideal_conditions, non_ideal_parameters, **kwargs
 ):
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        lrWeights, lrBias, num_shots, standard_gd_update, batch_size=batch_size, **kwargs
+        lrWeights, lrBias, num_shots, standard_gd_update, ideal_conditions, non_ideal_parameters,
+        batch_size=batch_size, **kwargs
     )
-
-
