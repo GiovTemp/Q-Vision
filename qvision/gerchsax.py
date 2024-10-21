@@ -1,6 +1,7 @@
 import numpy as np
 import os
 from keras.datasets import mnist
+import matplotlib.pyplot as plt
 
 def amplitude(z):
     return np.abs(z)
@@ -8,16 +9,38 @@ def amplitude(z):
 def phase(z):
     return np.angle(z)
 
+# Function to plot amplitude and phase of complex images
+def plot_complex_image(img, C):
+    # Compute amplitude and phase of the complex image
+    amplitude_C = np.abs(C)
+
+    # Plot amplitude and phase
+    plt.figure(figsize=(12, 6))
+
+    # Amplitude plot
+    plt.subplot(1, 2, 1)
+    plt.title("Amplitude of Modulated Image (C)")
+    plt.imshow(amplitude_C, cmap='gray')
+    plt.colorbar()
+
+    # Phase plot
+    plt.subplot(1, 2, 2)
+    plt.title("Image")
+    plt.imshow(img, cmap='gray')
+    plt.colorbar()
+
+    plt.show()
+
 def gerchberg_saxton(Source, Target, max_iterations=1000, tolerance=0.35):
 
     target_size = np.sqrt(Target.shape[0] * Target.shape[1])
-    A = np.fft.ifft2(Target) * target_size
 
     for i in range(max_iterations):
+        A = np.fft.ifft2(Target) * target_size
         B = amplitude(Source) * np.exp(1j * phase(A))
         C = np.fft.fft2(B) / target_size
-        D = amplitude(Target) * np.exp(1j * phase(C))
-        A = np.fft.ifft2(D) * target_size
+        # D = amplitude(Target) * np.exp(1j * phase(C))
+        # A = np.fft.ifft2(D) * target_size
 
         # Check for convergence
         error = np.linalg.norm(amplitude(C) - amplitude(Target))
@@ -50,6 +73,10 @@ def process_and_save_images(images, labels, folder_prefix):
         # Apply Gerchberg-Saxton algorithm
         B, C = gerchberg_saxton(Source, Target)
 
+        # plot_complex_image(image, C)
+        #
+        # break
+
         # Save source image (B) and modulated image (C)
         source_image_path = os.path.join(source_folder, f'source_image_{i}_label_{int(label)}.png')
         modulated_image_path = os.path.join(modulated_folder, f'modulated_image_{i}_label_{int(label)}.png')
@@ -69,11 +96,11 @@ def load_mnist():
     train0s, test0s = np.where(trainLabels == 0), np.where(testLabels == 0)
     train1s, test1s = np.where(trainLabels == 1), np.where(testLabels == 1)
 
-    train0sImgs = trainImgs[train0s[0]]
-    train1sImgs = trainImgs[train1s[0]]
+    train0sImgs = trainImgs[train0s[0]][:1000]
+    train1sImgs = trainImgs[train1s[0]][:1000]
 
-    test0sImgs = testImgs[test0s[0]]
-    test1sImgs = testImgs[test1s[0]]
+    test0sImgs = testImgs[test0s[0]][:100]
+    test1sImgs = testImgs[test1s[0]][:100]
 
     trainImgs = np.concatenate((train0sImgs, train1sImgs), axis=0)
     testImgs = np.concatenate((test0sImgs, test1sImgs), axis=0)

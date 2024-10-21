@@ -3,6 +3,7 @@ from qvision import QVision
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import optuna
 from sklearn.utils import shuffle
 
 def load_mnist():
@@ -18,6 +19,11 @@ def load_mnist():
 
     test0sImgs = testImgs[test0s[0]]
     test1sImgs = testImgs[test1s[0]]
+
+    # img = np.array(train0sImgs[0, :, :], dtype='float')
+    # pixels = img.reshape((28, 28))
+    # plt.imshow(pixels, cmap='gray')
+    # plt.show()
 
     trainImgs = np.concatenate((train0sImgs, train1sImgs), axis = 0)
     testImgs = np.concatenate((test0sImgs, test1sImgs), axis = 0)
@@ -59,6 +65,11 @@ def load_mnist():
                        constant_values = 0)
     testImgs = np.pad(testImgs, ((0,0),(2,2),(2,2)), mode='constant', \
                        constant_values = 0)
+
+    # img = np.array(trainImgs[0, :, :])
+    # pixels = img.reshape((32, 32))
+    # plt.imshow(pixels, cmap='gray')
+    # plt.show()
 
     # Reduce the training set
     trainImgs = trainImgs[:, :, :]
@@ -132,13 +143,11 @@ def shuffle_dataset(source_images, modulated_images, labels):
 
 
 # Impostazione degli iperparametri
-numEpochs = 100
-learningRateWeights = 0.075
-learningRateBias = 0.005
+factor = 35
+numEpochs = 1200
+learningRateWeights = 0.01/factor
+learningRateBias = 0.001/factor
 numShots = -1
-# learningRateWeights = 0.022811257645838745
-# learningRateBias = 0.007159442638014556
-# numShots = -1
 
 # Inizializzazione della classe QVision
 model = QVision(num_epochs=numEpochs, lr_weights=learningRateWeights, lr_bias=learningRateBias, num_shots=numShots)
@@ -159,21 +168,11 @@ test_images_folder = 'test_images'
 # Shuffle the training set (source images, modulated images, and labels)
 train_source_images, train_modulated_images, train_labels = shuffle_dataset(train_source_images, train_modulated_images, train_labels)
 
-# # Now you have the arrays for training and testing
-# print(f"Train Source Images: {train_source_images.shape}")
-# print(f"Train Modulated Images: {train_modulated_images.shape}")
-# print(f"Train Labels: {train_labels.shape}")
-#
-# print(f"Test Source Images: {test_source_images.shape}")
-# print(f"Test Modulated Images: {test_modulated_images.shape}")
-# print(f"Test Labels: {test_labels.shape}")
-
-
 # Preprocessamento dei dati (l'utente deve fornire trainImgs, trainLabels, testImgs, testLabels)
 # trainImgs, trainLabels, testImgs, testLabels = model.preprocess_data(trainImgs, trainLabels, testImgs, testLabels)
 
 # Training del modello
-weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history = model.train('gd', trainImgs, trainLabels, testImgs, testLabels, train_source_images, train_modulated_images, train_labels,
+weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history = model.train('gd', None, None, None, None, train_source_images, train_modulated_images, train_labels,
           test_source_images, test_modulated_images, test_labels, phase_modulation=True)
 
 # Visualizzazione dei grafici di perdita e accuratezza
@@ -188,27 +187,27 @@ Parameters:
 - accuracy_history: List of training accuracy values.
 - test_accuracy_history: List of validation accuracy values.
 """
-epochs = range(1, len(loss_history) + 1)
-
-plt.figure(figsize=(14, 6))
+# epochs = range(1, len(loss_history) + 1)
+#
+# plt.figure(figsize=(14, 6))
 
 # Plot loss
-plt.subplot(1, 2, 1)
-plt.plot(epochs, loss_history, label='Training Loss')
-plt.plot(epochs, test_loss_history, label='Validation Loss')
-plt.xlabel('Epochs')
-plt.ylabel('Loss')
-plt.title('Training and Validation Loss')
-plt.legend()
-
-# Plot accuracy
-plt.subplot(1, 2, 2)
-plt.plot(epochs, accuracy_history, label='Training Accuracy')
-plt.plot(epochs, test_accuracy_history, label='Validation Accuracy')
-plt.xlabel('Epochs')
-plt.ylabel('Accuracy')
-plt.title('Training and Validation Accuracy')
-plt.legend()
-
-plt.tight_layout()
-plt.show()
+# plt.subplot(1, 2, 1)
+# plt.plot(epochs, loss_history, label='Training Loss')
+# plt.plot(epochs, test_loss_history, label='Validation Loss')
+# plt.xlabel('Epochs')
+# plt.ylabel('Loss')
+# plt.title('Training and Validation Loss')
+# plt.legend()
+#
+# # Plot accuracy
+# plt.subplot(1, 2, 2)
+# plt.plot(epochs, accuracy_history, label='Training Accuracy')
+# plt.plot(epochs, test_accuracy_history, label='Validation Accuracy')
+# plt.xlabel('Epochs')
+# plt.ylabel('Accuracy')
+# plt.title('Training and Validation Accuracy')
+# plt.legend()
+#
+# plt.tight_layout()
+# plt.show()

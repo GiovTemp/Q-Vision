@@ -177,11 +177,6 @@ def common_optimization(
 ):
     """Common optimization loop with handling for complex numbers due to phase modulation."""
 
-    print('train_labels:', train_labels)
-    print('train labels:', train_labels)
-    print('target test:', test_labels)
-    print('test labels:', test_labels)
-
     # History initialization
     loss_history = []
     accuracy_history = []
@@ -199,8 +194,8 @@ def common_optimization(
     # Initial outputs and losses
     if phase_modulation:
         initial_outputs = np.array([
-            neuron_phase_modulation(weights, bias, trainImgs[idx, :, :], train_modulated_images[idx, :, :], num_shots)
-            for idx in range(trainImgs.shape[0])
+            neuron_phase_modulation(weights, bias, None, train_modulated_images[idx, :, :], num_shots)
+            for idx in range(train_modulated_images.shape[0])
         ], dtype=np.complex128)  # Ensure complex data type
 
         initial_losses = np.array([
@@ -209,8 +204,8 @@ def common_optimization(
         ])
 
         initial_test_outputs = np.array([
-            neuron_phase_modulation(weights, bias, testImgs[idx, :, :], train_modulated_images[idx, :, :], num_shots)
-            for idx in range(testImgs.shape[0])
+            neuron_phase_modulation(weights, bias, None, train_modulated_images[idx, :, :], num_shots)
+            for idx in range(test_modulated_images.shape[0])
         ], dtype=np.complex128)
 
         initial_test_losses = np.array([
@@ -254,8 +249,8 @@ def common_optimization(
             # No shuffle for standard GD
             if phase_modulation:
                 outputs = np.array([
-                    neuron_phase_modulation(weights, bias, trainImgs[idx, :, :], train_modulated_images[idx, :, :], num_shots)
-                    for idx in range(trainImgs.shape[0])
+                    neuron_phase_modulation(weights, bias, None, train_modulated_images[idx, :, :], num_shots)
+                    for idx in range(train_modulated_images.shape[0])
                 ], dtype=np.complex128)
 
             else:
@@ -267,12 +262,12 @@ def common_optimization(
             # Calculate losses using the magnitude of the complex outputs
             losses = np.array([loss(np.abs(outputs[idx]), train_labels[idx]) for idx in range(outputs.shape[0])])
             lossWeightsDerivatives = np.array([
-                np.atleast_1d(loss_derivative(np.abs(outputs[idx]), train_labels[idx], train_source_images[idx, :, :], train_modulated_images[idx, :, :], weights, bias, trainImgs[idx, :, :])[0])
-                for idx in range(trainImgs.shape[0])
+                np.atleast_1d(loss_derivative(np.abs(outputs[idx]), train_labels[idx], train_source_images[idx, :, :], train_modulated_images[idx, :, :], weights, bias, None)[0])
+                for idx in range(train_modulated_images.shape[0])
             ])
             lossBiasDerivatives = np.array([
-                np.atleast_1d(loss_derivative(np.abs(outputs[idx]), train_labels[idx], train_source_images[idx, :, :], train_modulated_images[idx, :, :], weights, bias, trainImgs[idx, :, :])[1])
-                for idx in range(trainImgs.shape[0])
+                np.atleast_1d(loss_derivative(np.abs(outputs[idx]), train_labels[idx], train_source_images[idx, :, :], train_modulated_images[idx, :, :], weights, bias, None)[1])
+                for idx in range(train_modulated_images.shape[0])
             ])
 
             mean_lossWeightsDerivatives = np.mean(lossWeightsDerivatives, axis=0)
@@ -288,8 +283,8 @@ def common_optimization(
             indices = np.random.permutation(trainImgs.shape[0])
 
             # Iterate over mini-batches or individual samples if batch_size = 1
-            for start_idx in range(0, trainImgs.shape[0], batch_size):
-                end_idx = min(start_idx + batch_size, trainImgs.shape[0])
+            for start_idx in range(0, train_modulated_images.shape[0], batch_size):
+                end_idx = min(start_idx + batch_size, train_modulated_images.shape[0])
                 batch_indices = indices[start_idx:end_idx]
 
                 batch_lossWeightDerivatives = []
@@ -298,13 +293,13 @@ def common_optimization(
                 # Iterate over samples in the current batch
                 for idx in batch_indices:
                     if phase_modulation:
-                        output = neuron_phase_modulation(weights, bias, trainImgs[idx, :, :], train_modulated_images[idx, :, :], num_shots)
+                        output = neuron_phase_modulation(weights, bias, None, train_modulated_images[idx, :, :], num_shots)
                     else:
                         output = neuron(weights, bias, trainImgs[idx, :, :], num_shots)
 
                     # Use magnitude for loss derivative calculations
                     lossWeightDerivative, lossBiasDerivative = loss_derivative(
-                        np.abs(output), train_labels[idx], train_source_images[idx, :, :], train_modulated_images[idx, :, :], weights, bias, trainImgs[idx, :, :]
+                        np.abs(output), train_labels[idx], train_source_images[idx, :, :], train_modulated_images[idx, :, :], weights, bias, None
                     )
 
                     batch_lossWeightDerivatives.append(lossWeightDerivative)
@@ -334,8 +329,8 @@ def common_optimization(
         # After each epoch, calculate losses and accuracy
         if phase_modulation:
             outputs = np.array([
-                neuron_phase_modulation(weights, bias, trainImgs[idx, :, :], train_modulated_images[idx, :, :], num_shots)
-                for idx in range(trainImgs.shape[0])
+                neuron_phase_modulation(weights, bias, None, train_modulated_images[idx, :, :], num_shots)
+                for idx in range(train_modulated_images.shape[0])
             ], dtype=np.complex128)
         else:
             outputs = np.array([
@@ -351,8 +346,8 @@ def common_optimization(
 
         if phase_modulation:
             test_outputs = np.array([
-                neuron_phase_modulation(weights, bias, testImgs[idx, :, :], test_modulated_images[idx, :, :], num_shots)
-                for idx in range(testImgs.shape[0])
+                neuron_phase_modulation(weights, bias, None, test_modulated_images[idx, :, :], num_shots)
+                for idx in range(test_modulated_images.shape[0])
             ], dtype=np.complex128)
         else:
             test_outputs = np.array([

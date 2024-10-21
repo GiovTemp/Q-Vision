@@ -24,8 +24,6 @@ def gerchberg_saxton(Source, Target, max_iterations=1000, tolerance=0.35):
         # Check for convergence
         error = np.linalg.norm(amplitude(C) - amplitude(Target))
 
-        # print(f'{i}: {error}')
-
         if error < tolerance:
             break
 
@@ -33,11 +31,6 @@ def gerchberg_saxton(Source, Target, max_iterations=1000, tolerance=0.35):
     return B, C
 
 def neuron(weights, bias, Img, modulated_image, num_shots, max_iterations=100):
-
-    # Source = np.ones((Img.shape[0], Img.shape[1]))
-    # Source = Source/np.linalg.norm(Source)
-    # Target = np.sqrt(Img)
-    # Target = Target / np.linalg.norm(Target)
 
     # _, modulated_image = gerchberg_saxton(Source, Target, max_iterations)
     modulated_image = modulated_image / np.linalg.norm(modulated_image)
@@ -48,13 +41,6 @@ def neuron(weights, bias, Img, modulated_image, num_shots, max_iterations=100):
     weights2 = np.fft.fft2(weights_phase)
     weights2 = weights2 / np.linalg.norm(weights2)
     prob = np.abs(np.sum(np.multiply(modulated_image, np.conj(weights2))))**2
-
-    #print('prob:', prob)
-
-    # print('norma di modulated_image:', np.linalg.norm(modulated_image))
-    # print('norma di weights2:', np.linalg.norm(weights2))
-    #
-    # print('prob:', prob)
 
     if num_shots == -1:
         f = prob
@@ -74,14 +60,6 @@ def spatial_loss_derivative(output, target, source_image, modulated_image, weigh
 
     F = output
     y = target
-    norm = np.sqrt(np.sum(np.square(weights)))
-
-    img_size = np.sqrt(Img.shape[0] * Img.shape[1])
-
-    # Source = np.ones((Img.shape[0], Img.shape[1]))
-    # Source = Source/np.linalg.norm(Source)
-    # Target = np.sqrt(Img)
-    # Target = Target / np.linalg.norm(Target)
 
     # source_image, modulated_image = gerchberg_saxton(Source, Target, 1000)
     modulated_image = modulated_image / np.linalg.norm(modulated_image)
@@ -93,13 +71,14 @@ def spatial_loss_derivative(output, target, source_image, modulated_image, weigh
     weights2 = weights2 / np.linalg.norm(weights2)
 
     g = np.sum(np.multiply(modulated_image, np.conj(weights2)))  # <I, U>
-    gPrime = -2 * math.pi * 1j * np.multiply(source_image, np.conj(weights_phase)) * img_size**2 # <I, dlambdaU>
+    gPrime = -2 * math.pi * 1j * np.multiply(source_image, np.conj(weights_phase)) * target.size # <I, dlambdaU>
 
     fPrime = 2 * np.real(g * np.conjugate(gPrime))  # 2Re[<I, U><I, dU>*]
 
     crossPrime = (F - y) / (F * (1 - F))
 
     gAbs = np.abs(g)  # sqrt(f)
+
     weights_derivative = crossPrime * sigPrime(gAbs ** 2 + bias) * fPrime
 
     bias_derivative = crossPrime * sigPrime(gAbs ** 2 + bias)

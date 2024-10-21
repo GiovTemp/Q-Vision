@@ -59,7 +59,7 @@ class QVision:
         return self.weights, self.bias, self.loss_history, self.test_loss_history, self.accuracy_history, self.test_accuracy_history
 
     @staticmethod
-    def initialize_weights(shape, low=-1, high=1):
+    def initialize_weights(shape, low=0, high=1):
         """Initialize weights with a uniform distribution."""
         return np.random.uniform(low, high, shape)
 
