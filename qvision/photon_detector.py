@@ -1,5 +1,5 @@
 import numpy as np
-
+from .utils import print_parameters
 
 def calculate_transmissibility(lamba):
     """
@@ -22,9 +22,6 @@ def calculate_photon_flow_pairs(Img, delta_T):
     max_intensity = np.max(Img)  # Trova il valore massimo nell'immagine
     return (np.sum(
         Img) / max_intensity * delta_T)  # Flusso normalizzato , diviso per delta T per rispettare il formato hz
-
-
-import numpy as np
 
 
 def coinc(f, Rate, eta, tau, T=None, N_p=100, Rifl=0.5):
@@ -161,6 +158,7 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
     """
 
     # Condizioni non ideali
+    global N_m, N_p, P_i_ab, Rate, delta_T, Tob, Tpr
     if not ideal_conditions:
         eta = non_ideal_parameters.get('eta', 0.0)
         tau = non_ideal_parameters.get('tau', 0.0)
@@ -193,4 +191,26 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
     else:
         f_i = f  # Se le condizioni sono ideali, restituiamo f direttamente
 
+    # Stampa dei parametri in formato tabellare
+    parameters = [
+        ["Parameter", "Value"],
+        ["Weights", weights.tolist()],
+        ["Image Shape", Img.shape],
+        ["Num Shots", num_shots],
+        ["Ideal Conditions", ideal_conditions],
+        ["C", non_ideal_parameters.get('C', 0.0)],
+        ["Eta", non_ideal_parameters.get('eta', [0.0, 0.0])],
+        ["Tau", non_ideal_parameters.get('tau', [0.0, 0.0])],
+        ["P", non_ideal_parameters.get('P', 0.0)],
+        ["Tob", Tob],
+        ["Tpr", Tpr],
+        ["N_m", N_m],
+        ["N_m", N_p],
+        ["Rate", Rate],
+        ["delta_T", delta_T],
+        ["P_i_ab", P_i_ab],
+        ["f", f],
+        ["f_i", f_i],
+    ]
+    print_parameters(parameters)
     return f_i

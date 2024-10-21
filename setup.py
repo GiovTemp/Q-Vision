@@ -8,7 +8,8 @@ setup(
     install_requires=[
         'numpy',
         'matplotlib',
-        'seaborn'
+        'seaborn',
+        'tabulate'
     ],
     url='https://github.com/GiovTemp/Q-Vision',
     license='MIT',

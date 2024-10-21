@@ -1,5 +1,6 @@
 # Q-Vision/qvision/utils.py
 
+from tabulate import tabulate
 import numpy as np
 
 def sig(x):
@@ -21,3 +22,7 @@ def accuracy(outputs, targets):
     predicted = np.reshape((outputs >= threshold).astype(int), (-1))
     true_positive = np.sum(targets == predicted)
     return true_positive / len(targets)
+
+def print_parameters(parameters):
+    print(tabulate(parameters, headers="firstrow", tablefmt="grid"))
+
