@@ -225,17 +225,6 @@ def remove_dead_time(times, dead_time):
     return np.array(cleaned_times)
 
 
-def remove_dead_time(times, dead_time):
-    """
-    Rimuove i rilevamenti che avvengono ad un intervallo di tempo dal precedente inferiore al tempo morto.
-    """
-    cleaned_times = []
-    for i in range(len(times)):
-        if i == 0 or times[i] - cleaned_times[-1] > dead_time:
-            cleaned_times.append(times[i])
-    return np.array(cleaned_times)
-
-
 def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameters, f, N):
     """
     Calculates f_i based on non-ideal conditions.
@@ -261,13 +250,6 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
         drc = non_ideal_parameters.get('drc', 0.0)  # Valore di drc, ma non utilizzato nell'algoritmo
         P = non_ideal_parameters.get('P', 0.0)
         C = non_ideal_parameters.get('C', 0.0)
-
-        print(P)
-        print(C)
-        print(drc)
-        print(eta)
-        print(tau)
-        print(f)
 
         if N == 0:
             #Calcolo coinc2 quando f = 0 solo al primo run
@@ -315,5 +297,5 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
         ["f", f],
         ["f_i", f_i],
     ]
-    #print_parameters(parameters)
+    print_parameters(parameters)
     return f_i, N
