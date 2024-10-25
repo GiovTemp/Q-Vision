@@ -261,6 +261,12 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
         P = non_ideal_parameters.get('P', 0.0)
         C = non_ideal_parameters.get('C', 0.0)
 
+        print(P)
+        print(C)
+        print(drc)
+        print(eta)
+        print(tau)
+
         if N == 0:
             #Calcolo coinc2 quando f = 0 solo al primo run
             #Solo la prima volta
