@@ -14,15 +14,10 @@ def calculate_transmissibility(lambda_ob):
     """
 
     n_p = lambda_ob.size  # Numero di pixel
-    cost = np.max([np.max(lambda_ob), 1])
-
+    #print(f"N_P: {n_p}")
+    cost = np.max([np.max(np.abs(lambda_ob)), 1])
+    #print(f"Cost: {cost}")
     return np.sum(lambda_ob) / (n_p * cost)
-
-
-def calculate_photon_flow_pairs(Img, delta_T):
-    max_intensity = np.max(Img)  # Trova il valore massimo nell'immagine
-    return (np.sum(
-        Img) / max_intensity * delta_T)  # Flusso normalizzato , diviso per delta T per rispettare il formato hz
 
 
 def coinc(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
@@ -140,8 +135,8 @@ def coinc2(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
         Delta_T = 1
 
     Trasm = 1 - Rifl  # Coefficiente di trasmissione del beamsplitter
-    N_phot = max(0, round(Rate * 1.2 * Delta_T))
-    #N_phot = round(Rate * 1.2 * Delta_T)  # Numero di coppie di fotoni coinvolte
+    #N_phot = max(0, round(Rate * 1.2 * Delta_T))
+    N_phot = round(Rate * 1.2 * Delta_T)  # Numero di coppie di fotoni coinvolte
     N_dark = round(max(dcr) * 1.2 * Delta_T)  # Numero di dark counts osservati
     N = np.zeros(N_p)
     del_t = np.zeros(N_p)
@@ -251,28 +246,42 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
         P = non_ideal_parameters.get('P', 0.0)
         C = non_ideal_parameters.get('C', 0.0)
 
+        #print(f"eta: {eta}")
+        #print(f"tau: {tau}")
+        #print(f"drc: {drc}")
+        #print(f"P: {P}")
+        #print(f"C: {C}")
+
         if N == 0:
             #Calcolo coinc2 quando f = 0 solo al primo run
             #Solo la prima volta
             Tob = 0.5
             Tpr = 0.5
-            delta_T = C / Tob * Tpr  # Calcolo di delta_T
+            delta_T = C / (Tob * Tpr)  # Calcolo di delta_T
+            #print(f"deltaT: {delta_T}")
             Rate = P / 4
-            N, _, _, _ = coinc2(0, Rate, eta, tau, drc, 1, N_p=100, Rifl=0.5)
-            N_m = N
-            P_i_ab = N_m / N  # Calcolo del numero medio di coppie di fotoni
+            #print(f"Rate: {Rate}")
+            N, _, _, _ = coinc2(0, Rate, eta, tau, drc, delta_T, N_p=100, Rifl=0.5)
+            #print(f"N: {N}")
+            f_i = 0  # Calcolo finale di f_i
+            #print(f"f_i: {f_i}")
             # Ottengo il numero di rivelazioni totali
         else:
             # Quando usiamo le immagini
             Tob = calculate_transmissibility(Img)  # Calcolo della trasmissibilità
+            #print(f"Tob: {Tob}")
             Tpr = calculate_transmissibility(weights)  # Calcolo della trasmissibilità del probe
-            delta_T = C / Tob * Tpr  # Calcolo di delta_T
+            #print(f"Tpr: {Tpr}")
+            delta_T = C / (Tob * Tpr)  # Calcolo di delta_T
+            #print(f"deltaT: {delta_T}")
             Rate = P * Tob * Tpr  # Calcolo del rate
-            if f<0:
-                f=f*-1 #inverto f perche al primo run mi da -1
-            N_m, _, _, _ = coinc2(f, Rate, eta, tau, drc, 1, N_p=1, Rifl=0.5)
+            #print(f"Rate: {Rate}")
+            N_m, _, _, _ = coinc2(f, Rate, eta, tau, drc, delta_T, N_p=1, Rifl=0.5)
+            #print(f"N_m: {N_m}")
             P_i_ab = N_m / N  # Calcolo del numero medio di coppie di fotoni
-        f_i = 1 - 2 * P_i_ab  # Calcolo finale di f_i
+            #print(f"P_i_ab: {P_i_ab}")
+            f_i = 1 - 2 * P_i_ab  # Calcolo finale di f_i
+            #print(f"f_i: {f_i}")
     else:
         f_i = f
 
@@ -290,10 +299,8 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
         ["Tob", Tob],
         ["Tpr", Tpr],
         ["N", N],
-        ["N_m", N_m],
         ["Rate", Rate],
         ["delta_T", delta_T],
-        ["P_i_ab", P_i_ab],
         ["f", f],
         ["f_i", f_i],
     ]
