@@ -140,7 +140,8 @@ def coinc2(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
         Delta_T = 1
 
     Trasm = 1 - Rifl  # Coefficiente di trasmissione del beamsplitter
-    N_phot = round(Rate * 1.2 * Delta_T)  # Numero di coppie di fotoni coinvolte
+    N_phot = max(0, round(Rate * 1.2 * Delta_T))
+    #N_phot = round(Rate * 1.2 * Delta_T)  # Numero di coppie di fotoni coinvolte
     N_dark = round(max(dcr) * 1.2 * Delta_T)  # Numero di dark counts osservati
     N = np.zeros(N_p)
     del_t = np.zeros(N_p)
