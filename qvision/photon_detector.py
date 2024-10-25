@@ -297,5 +297,5 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
         ["f", f],
         ["f_i", f_i],
     ]
-    print_parameters(parameters)
+    #print_parameters(parameters)
     return f_i, N
