@@ -1,21 +1,22 @@
 import numpy as np
 from .utils import print_parameters
 
-def calculate_transmissibility(lamba):
+
+def calculate_transmissibility(lambda_ob):
     """
     Calculates Tob and Tpr transmissibility based on the image and the prob.
     Args:
-        :param lamba:
+        :param lambda_ob:
 
     Returns:
         np.sum(lamba) / (n_p * cost): float, transmissibility of the SLM .
 
     """
 
-    n_p = lamba.size  # Numero di pixel
-    cost = np.max(lamba)  # Valore massimo dell'intensità del pixel
+    n_p = lambda_ob.size  # Numero di pixel
+    cost = np.max([np.max(lambda_ob), 1])
 
-    return np.sum(lamba) / (n_p * cost)
+    return np.sum(lambda_ob) / (n_p * cost)
 
 
 def calculate_photon_flow_pairs(Img, delta_T):
@@ -24,124 +25,217 @@ def calculate_photon_flow_pairs(Img, delta_T):
         Img) / max_intensity * delta_T)  # Flusso normalizzato , diviso per delta T per rispettare il formato hz
 
 
-def coinc(f, Rate, eta, tau, T=None, N_p=100, Rifl=0.5):
+def coinc(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
     """
-    Funzione per simulare il numero di coppie di fotoni rilevate.
+    Simula il numero di coincidenze di fotoni rilevati.
 
     Args:
         f: float, modulo quadro del prodotto scalare delle funzioni d'onda associate ai due fotoni della coppia.
-        Rate: float, numero di coppie di fotoni emessi nell'unità di tempo (Hz).
-        eta: list, vettore efficienza dei detector (rapporto fra il numero di fotoni rilevati sul numero di fotoni incidenti).
-        tau: list, vettore durata del tempo morto per i due detector (secondi).
-        T: float, durata di osservazione del singolo esperimento (secondi).
+        Rate: float, numero di coppie di fotoni incidenti sul beamsplitter nell'unità di tempo (Hz).
+        eta: list, efficienza dei detector (eta[0], eta[1]).
+        tau: list, durata del tempo morto per i due detector (tau[0], tau[1]).
+        dcr: list, dark count rate (Hz) per i due detector.
+        Delta_T: float, durata di osservazione del singolo esperimento (sec).
         N_p: int, numero di ripetizioni dell'esperimento.
         Rifl: float, coefficiente di riflessione del beamsplitter.
 
     Returns:
-        N_m: float, numero medio di coppie rilevate.
-        N: array, distribuzione del numero di coppie rilevate nelle N_p ripetizioni.
-        detec: array, numero medio di rilevazioni di fotoni per ogni singolo detector.
-        delt_t: float, intervallo di tempo medio fra l'incidenza sul beamsplitter di una coppia di fotoni con quella successiva (secondi).
-        t_tol: float, tempo medio necessario per avere P*T coppie di fotoni incidenti sul beamsplitter (salvo fluttuazioni coincide con T) (secondi).
+        N_m: float, numero medio di coincidenze rilevate.
+        N: numpy array, distribuzione del numero di coppie rilevate.
+        delt_t: float, intervallo di tempo medio fra le coincidenze.
+        t_tol: float, tempo medio necessario per avere P*T coppie di fotoni incidenti sul beamsplitter.
     """
+    # Impostazione dei parametri di default
+    if dcr is None:
+        dcr = [300, 300]
+        Delta_T = 1
+    elif Delta_T is None:
+        Delta_T = 1
 
-    # Se non viene specificato T, impostalo a 1
-    if T is None:
-        T = 1
+    Trasm = 1 - Rifl  # Coefficiente di trasmissione del beamsplitter
+    N_phot = round(Rate * 1.2 * Delta_T)  # Numero di coppie di fotoni coinvolte
+    N_dark = round(max(dcr) * 1.2 * Delta_T)  # Numero di dark counts osservati
+    N = np.zeros(N_p)
+    del_t = np.zeros(N_p)
+    t_tot = np.zeros(N_p)
 
-    # Coefficiente di trasmissione del beamsplitter
-    Trasm = 1 - Rifl
-
-    # Numero totale di coppie di fotoni coinvolte nell'esperimento
-    N_phot = round(Rate * T)
-
-    # Inizializzazione delle variabili
-    N = np.zeros(N_p)  # Distribuzione del numero di coppie rilevate
-    dete = np.zeros((2, N_p))  # Rilevazioni per i due detector
-    del_t = np.zeros(N_p)  # Intervalli di tempo fra le coppie di fotoni
-    t_tot = np.zeros(N_p)  # Tempo totale di arrivo delle coppie di fotoni
-
-    # Coefficiente della distribuzione di Poisson nella frequenza dell'arrivo di coppie di fotoni
+    # Coefficienti per la distribuzione di Poisson
     lambda_ = 1 / 100
-
-    # Campionamento del tempo (sec.)
-    dt_p = lambda_ / Rate
-
-    # Fattore di scala per la distribuzione di Poisson
+    dt_p = lambda_ / Rate  # Campionamento del tempo (sec.)
     fact = 1 / np.log(1 - lambda_)
 
-    # Probabilità di uscita da porte diverse del beamsplitter
-    C1 = (1 - f) * (Trasm ** 2 + Rifl ** 2) + (Trasm - Rifl) ** 2 * f
-    C2 = (1 + f) * Rifl * Trasm  # Probabilità di uscita dalla stessa porta
+    # Calcolo della probabilità di uscita
+    lambda_dark = np.array(dcr) * dt_p
+    fact1 = 1 / np.log(1 - lambda_dark[0])
+    fact2 = 1 / np.log(1 - lambda_dark[1])
 
-    # Ciclo per le ripetizioni dell'esperimento
+    Pab = (1 - f) * (Trasm ** 2 + Rifl ** 2) + (Trasm - Rifl) ** 2 * f
+    Paa = (1 + f) * Rifl * Trasm
+
+    # Ciclo per la ripetizione dell'esperimento
     for l in range(N_p):
-        # Generazione di N_phot numeri casuali, distribuzione uniforme fra 0 e 1
+        # Generazione di sequenze casuali
         prob_posto = np.random.rand(N_phot)
-
-        # Genera numeri casuali per il rilevamento
-        prob1 = np.random.rand(N_phot)  # Primo detector
-        prob2 = np.random.rand(N_phot)  # Secondo detector
+        prob1 = np.random.rand(N_phot)
+        prob2 = np.random.rand(N_phot)
 
         # Inizializzazione dei rilevamenti per i detector
         dete1 = np.zeros(N_phot)
         dete2 = np.zeros(N_phot)
+        dete1[((prob_posto < Pab) & (prob1 < eta[0])) | (
+                ((prob_posto >= Pab) & (prob_posto < Pab + Paa)) & ((prob1 < eta[0]) | (prob2 < eta[0])))] = 1
+        dete2[((prob_posto < Pab) & (prob2 < eta[1])) | (
+            ((prob_posto >= Pab + Paa) & ((prob1 < eta[1]) | (prob2 < eta[1]))))] = 1
 
-        # Determina i rilevamenti sul primo detector
-        dete1[(prob_posto < C1) & (prob1 < eta[0])] = 1
-        dete1[(prob_posto >= C1) & (prob_posto < C1 + C2) & ((prob1 < eta[0]) | (prob2 < eta[0]))] = 1
-
-        # Determina i rilevamenti sul secondo detector
-        dete2[(prob_posto < C1) & (prob2 < eta[1])] = 1
-        dete2[(prob_posto >= C1 + C2) & ((prob1 < eta[1]) | (prob2 < eta[1]))] = 1
-
-        # Genera sequenze di tempi casuali
+        # Tempo di arrivo delle coppie di fotoni
         situ = np.random.rand(N_phot)
-        nn = np.ceil(fact * np.log(1 - situ)).astype(int)  # Intervalli di tempo tra le coppie
-
-        # Calcola il tempo di attesa fra le coppie di fotoni
+        nn = np.ceil(fact * np.log(1 - situ)).astype(int)
         dt_r = nn * dt_p
-        t_a = np.zeros(N_phot)
-        for al in range(N_phot):
-            t_a[al] = np.sum(dt_r[:al + 1])  # Tempo di arrivo della al-esima coppia
+        t_a = np.cumsum(dt_r)
 
-        del_t[l] = np.mean(t_a[1:] - t_a[:-1])  # Tempo medio fra le coppie
-        t_tot[l] = t_a[-1]  # Tempo di arrivo dell'ultima coppia di fotoni
+        del_t[l] = np.mean(np.diff(t_a))  # Tempo medio fra le coppie
+        t_tot[l] = t_a[-1]  # Tempo totale di arrivo
 
-        # Rimuovi i rilevamenti in base al tempo morto per il primo detector
-        I_viv1 = np.where(dete1 == 1)[0]
-        j = 1
-        while j < len(I_viv1):
-            if t_a[I_viv1[j]] - t_a[I_viv1[j - 1]] <= tau[0]:
-                I_viv1 = np.delete(I_viv1, j)
-            else:
-                j += 1
-        dete1 = np.zeros_like(prob_posto)
-        dete1[I_viv1] = 1
+        # Tempi di rilevamento
+        t_a1 = t_a[dete1 == 1]
+        t_a2 = t_a[dete2 == 1]
 
-        # Rimuovi i rilevamenti in base al tempo morto per il secondo detector
-        I_viv2 = np.where(dete2 == 1)[0]
-        j = 1
-        while j < len(I_viv2):
-            if t_a[I_viv2[j]] - t_a[I_viv2[j - 1]] <= tau[1]:
-                I_viv2 = np.delete(I_viv2, j)
-            else:
-                j += 1
-        dete2 = np.zeros_like(prob_posto)
-        dete2[I_viv2] = 1
+        # Dark counts
+        dark_prob1 = np.random.rand(N_dark)
+        dark_prob2 = np.random.rand(N_dark)
+        nd1 = np.ceil(fact1 * np.log(1 - dark_prob1)).astype(int)
+        nd2 = np.ceil(fact2 * np.log(1 - dark_prob2)).astype(int)
 
-        N[l] = np.sum(dete1 * dete2)  # Numero di coppie rilevate
-        dete[:, l] = np.array([np.sum(dete1), np.sum(dete2)])  # Rilevamenti per entrambi i detector
+        dt_d1 = nd1 * dt_p
+        dt_d2 = nd2 * dt_p
 
-    N_m = np.mean(N)  # Numero medio di coppie rilevate
-    detec = np.mean(dete, axis=1)  # Numero medio di rilevazioni per ogni detector
-    delt_t = np.mean(del_t)  # Tempo medio fra le coppie
-    t_tol = np.mean(t_tot)  # Tempo totale
+        t_d1 = np.cumsum(dt_d1)
+        t_d2 = np.cumsum(dt_d2)
 
-    return N_m, N, detec, delt_t, t_tol
+        # Rilevamenti finali
+        t_1 = np.concatenate([t_a1, t_d1])
+        t_1 = np.sort(t_1[t_1 <= Delta_T])
+        t_2 = np.concatenate([t_a2, t_d2])
+        t_2 = np.sort(t_2[t_2 <= Delta_T])
+
+        # Rimozione dei rilevamenti basati su tempo morto
+        t_1 = remove_dead_time(t_1, tau[0])
+        t_2 = remove_dead_time(t_2, tau[1])
+
+        # Controllo delle coincidenze
+        tt = np.concatenate([t_1, t_2])
+        tt = np.sort(tt)
+        N[l] = np.sum(tt == np.roll(tt, -1))  # Numero di coppie rilevate
+
+    N_m = np.mean(N)
+    return N_m, N, np.mean(del_t), np.mean(t_tot)
 
 
-def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameters, f):
+def coinc2(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
+    # Impostazione dei parametri di default
+    if dcr is None:
+        dcr = [300, 300]
+        Delta_T = 1
+    elif Delta_T is None:
+        Delta_T = 1
+
+    Trasm = 1 - Rifl  # Coefficiente di trasmissione del beamsplitter
+    N_phot = round(Rate * 1.2 * Delta_T)  # Numero di coppie di fotoni coinvolte
+    N_dark = round(max(dcr) * 1.2 * Delta_T)  # Numero di dark counts osservati
+    N = np.zeros(N_p)
+    del_t = np.zeros(N_p)
+    t_tot = np.zeros(N_p)
+
+    lambda_ = 1 / 100
+    dt_p = lambda_ / Rate  # Campionamento del tempo (sec.)
+    fact = 1 / np.log(1 - lambda_)
+
+    # Calcolo della probabilità di uscita
+    lambda_dark = np.array(dcr) * dt_p
+    fact1 = 1 / np.log(1 - lambda_dark[0])
+    fact2 = 1 / np.log(1 - lambda_dark[1])
+
+    Pab = (1 - f) * (Trasm ** 2 + Rifl ** 2) + (Trasm - Rifl) ** 2 * f
+    Paa = (1 + f) * Rifl * Trasm
+
+    # Ciclo per la ripetizione dell'esperimento
+    for l in range(N_p):
+        # Generazione di sequenze casuali
+        prob_posto = np.random.rand(N_phot)
+        prob1 = np.random.rand(N_phot)
+        prob2 = np.random.rand(N_phot)
+
+        dete1 = np.zeros(N_phot)
+        dete2 = np.zeros(N_phot)
+        dete1[((prob_posto < Pab) & (prob1 < eta[0])) | (
+                ((prob_posto >= Pab) & (prob_posto < Pab + Paa)) & ((prob1 < eta[0]) | (prob2 < eta[0])))] = 1
+        dete2[((prob_posto < Pab) & (prob2 < eta[1])) | (
+            ((prob_posto >= Pab + Paa) & ((prob1 < eta[1]) | (prob2 < eta[1]))))] = 1
+
+        situ = np.random.rand(N_phot)
+        nn = np.ceil(fact * np.log(1 - situ)).astype(int)
+        dt_r = nn * dt_p
+        t_a = np.cumsum(dt_r)
+
+        del_t[l] = np.mean(np.diff(t_a))
+        t_tot[l] = t_a[-1] if len(t_a) > 0 else 0
+
+        t_a1 = t_a[dete1 == 1]
+        t_a2 = t_a[dete2 == 1]
+
+        dark_prob1 = np.random.rand(N_dark)
+        dark_prob2 = np.random.rand(N_dark)
+        nd1 = np.ceil(fact1 * np.log(1 - dark_prob1)).astype(int)
+        nd2 = np.ceil(fact2 * np.log(1 - dark_prob2)).astype(int)
+
+        dt_d1 = nd1 * dt_p
+        dt_d2 = nd2 * dt_p
+
+        t_d1 = np.cumsum(dt_d1)
+        t_d2 = np.cumsum(dt_d2)
+
+        t_1 = np.concatenate([t_a1, t_d1])
+        t_1 = np.sort(t_1[t_1 <= Delta_T])
+        t_2 = np.concatenate([t_a2, t_d2])
+        t_2 = np.sort(t_2[t_2 <= Delta_T])
+
+        t_1 = remove_dead_time(t_1, tau[0])
+        t_2 = remove_dead_time(t_2, tau[1])
+
+        tt = np.concatenate([t_1, t_2])
+        tt = np.sort(tt)
+
+        # Controllo delle coincidenze solo se `tt` contiene almeno due elementi
+        if len(tt) > 1:
+            N[l] = np.sum(tt[:-1] == np.roll(tt, -1)[:-1])
+
+    N_m = np.mean(N)
+    return N_m, N, np.mean(del_t), np.mean(t_tot)
+
+
+def remove_dead_time(times, dead_time):
+    """
+    Rimuove i rilevamenti che avvengono ad un intervallo di tempo dal precedente inferiore al tempo morto.
+    """
+    cleaned_times = []
+    for i in range(len(times)):
+        if i == 0 or times[i] - cleaned_times[-1] > dead_time:
+            cleaned_times.append(times[i])
+    return np.array(cleaned_times)
+
+
+def remove_dead_time(times, dead_time):
+    """
+    Rimuove i rilevamenti che avvengono ad un intervallo di tempo dal precedente inferiore al tempo morto.
+    """
+    cleaned_times = []
+    for i in range(len(times)):
+        if i == 0 or times[i] - cleaned_times[-1] > dead_time:
+            cleaned_times.append(times[i])
+    return np.array(cleaned_times)
+
+
+def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameters, f, N):
     """
     Calculates f_i based on non-ideal conditions.
 
@@ -155,6 +249,7 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
 
     Returns:
         f_i: float, computed value of f_i.
+        :param N:
     """
 
     # Condizioni non ideali
@@ -163,33 +258,31 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
         eta = non_ideal_parameters.get('eta', 0.0)
         tau = non_ideal_parameters.get('tau', 0.0)
         drc = non_ideal_parameters.get('drc', 0.0)  # Valore di drc, ma non utilizzato nell'algoritmo
+        P = non_ideal_parameters.get('P', 0.0)
+        C = non_ideal_parameters.get('C', 0.0)
 
-        # Se f è zero, impostiamo Tpr e Tob a 0.5
-        if f == 0:
-            Tpr = 0.5  # Trasmissibilità
+        if N == 0:
+            #Calcolo coinc2 quando f = 0 solo al primo run
+            #Solo la prima volta
             Tob = 0.5
-            delta_T = 4 * non_ideal_parameters.get('C', 0.0)
-            P = non_ideal_parameters.get('P', 0.0)
+            Tpr = 0.5
+            delta_T = C / Tob * Tpr  # Calcolo di delta_T
             Rate = P / 4
-            N_p = 1
+            N, _, _, _ = coinc2(0, Rate, eta, tau, drc, 1, N_p=100, Rifl=0.5)
+            N_m = N
+            P_i_ab = N_m / N  # Calcolo del numero medio di coppie di fotoni
+            # Ottengo il numero di rivelazioni totali
         else:
-            # Calcolo per condizioni non ideali
-            norm = np.sqrt(np.sum(np.square(weights)))  # Normalizzazione dei pesi
-            Probe = np.square(weights / norm)  # Calcolo del probe
+            # Quando usiamo le immagini
             Tob = calculate_transmissibility(Img)  # Calcolo della trasmissibilità
-            Tpr = calculate_transmissibility(Probe)  # Calcolo della trasmissibilità del probe
-            delta_T = non_ideal_parameters.get('C', 0.0) / Tob * Tpr  # Calcolo di delta_T
-            P = non_ideal_parameters.get('P', 0.0)  # Calcolo del flusso di coppia
+            Tpr = calculate_transmissibility(weights)  # Calcolo della trasmissibilità del probe
+            delta_T = C / Tob * Tpr  # Calcolo di delta_T
             Rate = P * Tob * Tpr  # Calcolo del rate
-            N_p = 1  # Numero di ripetizioni
-
-        # Chiamata alla funzione coinc per ottenere N_m
-        N_m, _, _, _, _ = coinc(f, Rate, eta, tau, delta_T, N_p=N_p, Rifl=0.5)
-
-        P_i_ab = N_m / num_shots  # Calcolo del numero medio di coppie di fotoni
+            N_m, _, _, _ = coinc2(f, Rate, eta, tau, drc, 1, N_p=1, Rifl=0.5)
+            P_i_ab = N_m / N  # Calcolo del numero medio di coppie di fotoni
         f_i = 1 - 2 * P_i_ab  # Calcolo finale di f_i
     else:
-        f_i = f  # Se le condizioni sono ideali, restituiamo f direttamente
+        f_i = f
 
     # Stampa dei parametri in formato tabellare
     parameters = [
@@ -204,8 +297,8 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
         ["P", non_ideal_parameters.get('P', 0.0)],
         ["Tob", Tob],
         ["Tpr", Tpr],
+        ["N", N],
         ["N_m", N_m],
-        ["N_m", N_p],
         ["Rate", Rate],
         ["delta_T", delta_T],
         ["P_i_ab", P_i_ab],
@@ -213,4 +306,4 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
         ["f_i", f_i],
     ]
     print_parameters(parameters)
-    return f_i
+    return f_i, N

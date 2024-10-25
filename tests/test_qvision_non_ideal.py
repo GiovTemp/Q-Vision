@@ -51,7 +51,7 @@ class TestQVision(unittest.TestCase):
 
         self.model.initialize_parameters()
         self.model.set_ideal_conditions(False)
-        self.model.update_non_ideal_parameters(C=1, eta=[0.2, 0.2], tau=[10 ** -5, 10 ** -5], P=70000)
+        self.model.update_non_ideal_parameters(C=1, eta=[0.2, 0.2], tau=[10 ** -5, 10 ** -5], drc=[300, 300], P=70000)
 
         for optimizer in optimizers:
             print(f'Training with {optimizer} optimizer...')
