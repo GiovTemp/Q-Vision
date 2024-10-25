@@ -266,6 +266,7 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
         print(drc)
         print(eta)
         print(tau)
+        print(f)
 
         if N == 0:
             #Calcolo coinc2 quando f = 0 solo al primo run
@@ -284,6 +285,8 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
             Tpr = calculate_transmissibility(weights)  # Calcolo della trasmissibilità del probe
             delta_T = C / Tob * Tpr  # Calcolo di delta_T
             Rate = P * Tob * Tpr  # Calcolo del rate
+            if f<0:
+                f=f*-1 #inverto f perche al primo run mi da -1
             N_m, _, _, _ = coinc2(f, Rate, eta, tau, drc, 1, N_p=1, Rifl=0.5)
             P_i_ab = N_m / N  # Calcolo del numero medio di coppie di fotoni
         f_i = 1 - 2 * P_i_ab  # Calcolo finale di f_i
