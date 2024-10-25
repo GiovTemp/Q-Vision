@@ -6,7 +6,7 @@ from .training import train
 
 
 class QVision:
-    def __init__(self, input_shape=(32, 32), num_epochs=150, lr_weights=0.075, lr_bias=0.005, num_shots=-1,
+    def __init__(self, input_shape=(28, 28), num_epochs=150, lr_weights=0.075, lr_bias=0.005, num_shots=-1,
                  momentum=0.9, batch_size=32):
         self.input_shape = input_shape
         self.num_epochs = num_epochs
@@ -59,7 +59,7 @@ class QVision:
         return self.weights, self.bias, self.loss_history, self.test_loss_history, self.accuracy_history, self.test_accuracy_history
 
     @staticmethod
-    def initialize_weights(shape, low=0, high=1):
+    def initialize_weights(shape, low=-0.5, high=0.5):
         """Initialize weights with a uniform distribution."""
         return np.random.uniform(low, high, shape)
 

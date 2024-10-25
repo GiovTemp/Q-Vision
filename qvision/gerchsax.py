@@ -31,24 +31,18 @@ def plot_complex_image(img, C):
 
     plt.show()
 
-def gerchberg_saxton(Source, Target, max_iterations=1000, tolerance=0.35):
+def gerch_sax(I, F, N_tot=10):
+    n, m = F.shape
+    D = F
+    trend = np.zeros(N_tot)
 
-    target_size = np.sqrt(Target.shape[0] * Target.shape[1])
+    for i in range(N_tot):
+        A = np.fft.ifft2(D) * np.sqrt(n * m)
+        B = I * np.exp(1j * np.angle(A))
+        C = np.fft.fft2(B) / np.sqrt(n * m)
+        D = F * np.exp(1j * np.angle(C))
+        trend[i] = np.linalg.norm(np.abs(C) - np.abs(F))
 
-    for i in range(max_iterations):
-        A = np.fft.ifft2(Target) * target_size
-        B = amplitude(Source) * np.exp(1j * phase(A))
-        C = np.fft.fft2(B) / target_size
-        # D = amplitude(Target) * np.exp(1j * phase(C))
-        # A = np.fft.ifft2(D) * target_size
-
-        # Check for convergence
-        error = np.linalg.norm(amplitude(C) - amplitude(Target))
-
-        if error < tolerance:
-            break
-
-    Retrieved_Phase = phase(A)
     return B, C
 
 def save_image_npy(image, path):
@@ -71,15 +65,17 @@ def process_and_save_images(images, labels, folder_prefix):
         Source = Source/np.linalg.norm(Source)
         Target = image
         # Apply Gerchberg-Saxton algorithm
-        B, C = gerchberg_saxton(Source, Target)
+        B, C = gerch_sax(Source, Target)
 
         # plot_complex_image(image, C)
+        # print(label)
         #
-        # break
+        # if i == 5:
+        #     break
 
         # Save source image (B) and modulated image (C)
-        source_image_path = os.path.join(source_folder, f'source_image_{i}_label_{int(label)}.png')
-        modulated_image_path = os.path.join(modulated_folder, f'modulated_image_{i}_label_{int(label)}.png')
+        source_image_path = os.path.join(source_folder, f'image_{i}_label_{int(label)}.png')
+        modulated_image_path = os.path.join(modulated_folder, f'image_{i}_label_{int(label)}.png')
 
         # Save the images as .npy files
         save_image_npy(B, source_image_path)
@@ -137,9 +133,9 @@ def load_mnist():
     trainImgs = np.sqrt(trainImgs[:, :, :])
     testImgs = np.sqrt(testImgs[:, :, :])
 
-    # Padding from 28x28 to 32x32
-    trainImgs = np.pad(trainImgs, ((0, 0), (2, 2), (2, 2)), mode='constant', constant_values=0)
-    testImgs = np.pad(testImgs, ((0, 0), (2, 2), (2, 2)), mode='constant', constant_values=0)
+    # # Padding from 28x28 to 32x32
+    # trainImgs = np.pad(trainImgs, ((0, 0), (2, 2), (2, 2)), mode='constant', constant_values=0)
+    # testImgs = np.pad(testImgs, ((0, 0), (2, 2), (2, 2)), mode='constant', constant_values=0)
 
     # Reduce the training set
     trainImgs = trainImgs[:, :, :]
