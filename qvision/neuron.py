@@ -36,9 +36,9 @@ def spatial_loss_derivative(output, target, weights, bias, Img):
     """ Compute the derivative of the binary cross-entropy with respect to the
         neuron parameters, with spatial-encoded input. """
     # Check
-    if output == 1:
-        raise ValueError('Output is 1!')
-    elif output <= 0:
+    #if output == 1:
+        #raise ValueError('Output is 1!')
+    if output <= 0:
         raise ValueError('Output is negative!')
     elif 1 - output <= 0:
         raise ValueError('Output is greater than 1!')
