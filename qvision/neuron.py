@@ -207,27 +207,17 @@ def common_optimization(
     # Recupero la dimensione del batch dai kwargs, default 1 per SGD e 32 per Mini-Batch GD
     batch_size = kwargs.get('batch_size', 1)  # Default a 1 per SGD
 
-    # Verbose initial values
-    print('EPOCH', 0)
-    initial_outputs = np.array(
-        [neuron_model.neuron(weights, bias, trainImgs[idx, :, :], num_shots, ideal_conditions, non_ideal_parameters) for idx in
-         range(trainImgs.shape[0])])
-    initial_losses = np.array([loss(initial_outputs[idx], targets[idx]) for idx in range(initial_outputs.shape[0])])
-    initial_test_outputs = np.array(
-        [neuron_model.neuron(weights, bias, testImgs[idx, :, :], num_shots, ideal_conditions, non_ideal_parameters) for idx in
-         range(testImgs.shape[0])])
-    initial_test_losses = np.array(
-        [loss(initial_test_outputs[idx], test_targets[idx]) for idx in range(initial_test_outputs.shape[0])])
+    # Inizializzazione delle liste di cronologia per perdita e accuratezza
+    loss_history = []
+    accuracy_history = []
+    test_loss_history = []
+    test_accuracy_history = []
 
-    loss_history.append(np.mean(initial_losses))
-    accuracy_history.append(accuracy(initial_outputs, targets))
-
-    test_loss_history = [np.mean(initial_test_losses)]
-    test_accuracy_history = [accuracy(initial_test_outputs, test_targets)]
-
-    print('Loss', loss_history[0], 'Val_Loss', test_loss_history[0])
-    print('Accuracy', accuracy_history[0], 'Val_Acc', test_accuracy_history[0])
-    print('---')
+    # Aggiungi un valore di default (ad es., 0) per il primo ciclo di epoch se necessario
+    loss_history.append(0)  # Valore iniziale fittizio, se necessario per il primo ciclo
+    accuracy_history.append(0)
+    test_loss_history.append(0)
+    test_accuracy_history.append(0)
 
     for epoch in range(num_epochs):
         if update_fn == standard_gd_update:
