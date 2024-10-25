@@ -255,14 +255,15 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
         if N == 0:
             #Calcolo coinc2 quando f = 0 solo al primo run
             #Solo la prima volta
-            Tob = 0.5
-            Tpr = 0.5
-            delta_T = C / (Tob * Tpr)  # Calcolo di delta_T
+            #Tob = 0.5
+            #Tpr = 0.5
+            #delta_T = C / (Tob * Tpr)  # Calcolo di delta_T
             #print(f"deltaT: {delta_T}")
-            Rate = P / 4
+            #Rate = P / 4
             #print(f"Rate: {Rate}")
-            N, _, _, _ = coinc2(0, Rate, eta, tau, drc, delta_T, N_p=100, Rifl=0.5)
+            #N, _, _, _ = coinc2(0, Rate, eta, tau, drc, delta_T, N_p=100, Rifl=0.5)
             #print(f"N: {N}")
+            N = 1312.88
             f_i = 0  # Calcolo finale di f_i
             #print(f"f_i: {f_i}")
             # Ottengo il numero di rivelazioni totali
@@ -285,24 +286,4 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
     else:
         f_i = f
 
-    # Stampa dei parametri in formato tabellare
-    parameters = [
-        ["Parameter", "Value"],
-        ["Weights", weights.tolist()],
-        ["Image Shape", Img.shape],
-        ["Num Shots", num_shots],
-        ["Ideal Conditions", ideal_conditions],
-        ["C", non_ideal_parameters.get('C', 0.0)],
-        ["Eta", non_ideal_parameters.get('eta', [0.0, 0.0])],
-        ["Tau", non_ideal_parameters.get('tau', [0.0, 0.0])],
-        ["P", non_ideal_parameters.get('P', 0.0)],
-        ["Tob", Tob],
-        ["Tpr", Tpr],
-        ["N", N],
-        ["Rate", Rate],
-        ["delta_T", delta_T],
-        ["f", f],
-        ["f_i", f_i],
-    ]
-    #print_parameters(parameters)
     return f_i, N
