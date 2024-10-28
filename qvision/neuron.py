@@ -226,13 +226,16 @@ def common_optimization(
                     np.abs(output), train_labels[idx], train_source_images[idx, :, :], train_modulated_images[idx, :, :], weights, bias, None
                 )
 
+                # print('lossWeightDerivative:', lossWeightDerivative)
+                # print('lossBiasDerivative:', lossBiasDerivative)
+
                 if update_fn == sgd_update:
                     weights, bias, cache = update_fn(
                         weights, bias, lossWeightDerivative, lossBiasDerivative, lrWeights, lrBias, cache
                     )
                 elif update_fn == sgd_momentum_update:
                     weights, bias, cache = update_fn(
-                        weights, bias, batch_lossWeightDerivatives, batch_lossBiasDerivatives, lrWeights, lrBias, cache, momentum
+                        weights, bias, lossWeightDerivative, lossBiasDerivative, lrWeights, lrBias, cache, momentum
                     )
 
                 batch_lossWeightDerivatives.append(lossWeightDerivative)
@@ -294,8 +297,12 @@ def standard_gd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivative
 
 # Define the SGD update function
 def sgd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache):
-    weights -= lrWeights * lossWeightsDerivatives
-    bias -= lrBias * lossBiasDerivatives
+    clipped_gradients_weights = clip_gradients(lossWeightsDerivatives)
+    clipped_gradients_bias = clip_gradients(lossBiasDerivatives)
+    weights -= lrWeights * clipped_gradients_weights
+    bias -= lrBias * clipped_gradients_bias
+    # weights -= lrWeights * lossWeightsDerivatives
+    # bias -= lrBias * lossBiasDerivatives
     return weights, bias, cache
 
 def mini_batch_gd(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache):
@@ -309,25 +316,36 @@ def mini_batch_gd(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lr
 #     return new_weights, new_bias, cache
 
 def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, momentum=0.9):
-    """ Update rule for Stochastic Gradient Descent (SGD) with Momentum """
-    # Assicurati che le derivate siano trattate come array di almeno 1D
+    """Update rule for Stochastic Gradient Descent (SGD) with Momentum."""
+
+    # Ensure derivatives are treated as at least 1D arrays
     lossWeightsDerivatives = np.atleast_1d(lossWeightsDerivatives)
     lossBiasDerivatives = np.atleast_1d(lossBiasDerivatives)
 
-    # Recupera le velocità dai valori precedenti
+    # Retrieve previous velocities from the cache, or initialize if not present
     velocity_weights = cache.get('velocity_weights', np.zeros_like(weights))
     velocity_bias = cache.get('velocity_bias', np.zeros_like(bias))
 
-    # Aggiorna le velocità con il termine di momentum
-    velocity_weights = momentum * velocity_weights + lrWeights * lossWeightsDerivatives
-    velocity_bias = momentum * velocity_bias + lrBias * lossBiasDerivatives
+    clipped_gradients_weights = clip_gradients(lossWeightsDerivatives)
+    clipped_gradients_bias = clip_gradients(lossBiasDerivatives)
 
-    # Aggiorna i parametri (pesi e bias)
-    weights -= velocity_weights
-    bias -= velocity_bias
+    # Update velocities with the momentum term and the current gradient
+    velocity_weights = momentum * velocity_weights - lrWeights * clipped_gradients_weights
+    velocity_bias = momentum * velocity_bias - lrBias * clipped_gradients_bias
 
-    # Ritorna i pesi aggiornati, il bias aggiornato, e le velocità
-    return weights, bias, {'velocity_weights': velocity_weights, 'velocity_bias': velocity_bias}
+    # Update parameters using the velocity
+    weights += velocity_weights
+    bias += velocity_bias
+
+    # Return the updated weights, bias, and cache with the updated velocities
+    cache['velocity_weights'] = velocity_weights
+    cache['velocity_bias'] = velocity_bias
+
+    return weights, bias, cache
+
+def clip_gradients(gradients, clip_value=1.0):
+    gradients = np.clip(gradients, -clip_value, clip_value)
+    return gradients
 
 def optimization_standard_gd(
         loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, train_source_images, train_modulated_images, train_labels,

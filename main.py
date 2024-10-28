@@ -172,7 +172,7 @@ train_source_images, train_modulated_images, train_labels = shuffle_dataset(trai
 # trainImgs, trainLabels, testImgs, testLabels = model.preprocess_data(trainImgs, trainLabels, testImgs, testLabels)
 
 # Training del modello
-weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history = model.train('gd', None, None, None, None, train_source_images, train_modulated_images, train_labels,
+weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history = model.train('sgd_momentum', None, None, None, None, train_source_images, train_modulated_images, train_labels,
           test_source_images, test_modulated_images, test_labels, phase_modulation=True)
 
 # Visualizzazione dei grafici di perdita e accuratezza
