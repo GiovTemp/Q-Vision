@@ -28,4 +28,4 @@ def calculate_amplitudes(images):
     if len(images.shape) != 3:
         return np.sqrt(images[:, :, :, 0])
     else:
-        return np.sqrt(images[:, :, :)
+        return np.sqrt(images[:, :, :))
