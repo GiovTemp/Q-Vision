@@ -331,7 +331,7 @@ def common_optimization(
                     output = neuron_model.neuron_phase_modulation(weights, bias, train_modulated_images[idx, :, :], num_shots)
 
                     # Compute loss derivatives with respect to weights and bias
-                    lossWeightDerivative, lossBiasDerivative = loss_derivative(
+                    lossWeightDerivative, lossBiasDerivative = pm_spatial_loss_derivative(
                         np.abs(output), trainlabels[idx], train_source_images[idx, :, :],
                         train_modulated_images[idx, :, :], weights, bias
                     )
@@ -342,7 +342,7 @@ def common_optimization(
                     # Compute loss derivatives with respect to weights and bias
                     lossWeightDerivative, lossBiasDerivative = loss_derivative(
                         np.abs(output), trainlabels[idx], weights, bias, trainImgs[idx, :, :]
-                )
+                    )
 
                 # print('lossWeightDerivative:', lossWeightDerivative)
                 # print('lossBiasDerivative:', lossBiasDerivative)

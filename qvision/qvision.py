@@ -6,7 +6,7 @@ from .training import train
 
 
 class QVision:
-    def __init__(self, input_shape=(28, 28), num_epochs=150, lr_weights=0.075, lr_bias=0.005, num_shots=-1,
+    def __init__(self, input_shape=(32, 32), num_epochs=150, lr_weights=0.075, lr_bias=0.005, num_shots=-1,
                  momentum=0.9, batch_size=32, ideal_conditions=True):
         self.input_shape = input_shape
         self.num_epochs = num_epochs
