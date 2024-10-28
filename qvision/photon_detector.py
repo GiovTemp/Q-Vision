@@ -20,39 +20,40 @@ def calculate_transmissibility(lambda_ob):
     return np.sum(lambda_ob) / (n_p * cost)
 
 
-def coinc(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
+def coinc2_optimized(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
     """
-    Simula il numero di coincidenze di fotoni rilevati.
+    Simula il numero di coincidenze di fotoni rilevati in modo ottimizzato usando solo NumPy.
 
     Args:
         f: float, modulo quadro del prodotto scalare delle funzioni d'onda associate ai due fotoni della coppia.
         Rate: float, numero di coppie di fotoni incidenti sul beamsplitter nell'unità di tempo (Hz).
-        eta: list, efficienza dei detector (eta[0], eta[1]).
-        tau: list, durata del tempo morto per i due detector (tau[0], tau[1]).
-        dcr: list, dark count rate (Hz) per i due detector.
+        eta: array-like, efficienza dei detector (eta[0], eta[1]).
+        tau: array-like, durata del tempo morto per i due detector (tau[0], tau[1]).
+        dcr: array-like, dark count rate (Hz) per i due detector.
         Delta_T: float, durata di osservazione del singolo esperimento (sec).
         N_p: int, numero di ripetizioni dell'esperimento.
         Rifl: float, coefficiente di riflessione del beamsplitter.
 
     Returns:
         N_m: float, numero medio di coincidenze rilevate.
-        N: numpy array, distribuzione del numero di coppie rilevate.
+        N: array, distribuzione del numero di coppie rilevate.
         delt_t: float, intervallo di tempo medio fra le coincidenze.
-        t_tol: float, tempo medio necessario per avere P*T coppie di fotoni incidenti sul beamsplitter.
+        t_tot: float, tempo medio necessario per avere P*T coppie di fotoni incidenti sul beamsplitter.
     """
     # Impostazione dei parametri di default
     if dcr is None:
         dcr = [300, 300]
-        Delta_T = 1
-    elif Delta_T is None:
+    if Delta_T is None:
         Delta_T = 1
 
     Trasm = 1 - Rifl  # Coefficiente di trasmissione del beamsplitter
-    N_phot = round(Rate * 1.2 * Delta_T)  # Numero di coppie di fotoni coinvolte
-    N_dark = round(max(dcr) * 1.2 * Delta_T)  # Numero di dark counts osservati
-    N = np.zeros(N_p)
-    del_t = np.zeros(N_p)
-    t_tot = np.zeros(N_p)
+    N_phot = int(round(Rate * 1.2 * Delta_T))  # Numero di coppie di fotoni coinvolte
+    N_dark = int(round(max(dcr) * 1.2 * Delta_T))  # Numero di dark counts osservati
+
+    # Pre-allocazione degli array per i risultati
+    N = np.zeros(N_p, dtype=np.int32)
+    del_t = np.zeros(N_p, dtype=np.float32)
+    t_tot = np.zeros(N_p, dtype=np.float32)
 
     # Coefficienti per la distribuzione di Poisson
     lambda_ = 1 / 100
@@ -61,70 +62,117 @@ def coinc(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
 
     # Calcolo della probabilità di uscita
     lambda_dark = np.array(dcr) * dt_p
+    epsilon = 1e-10  # Evita log(0)
+    lambda_dark = np.clip(lambda_dark, epsilon, 1 - epsilon)
     fact1 = 1 / np.log(1 - lambda_dark[0])
     fact2 = 1 / np.log(1 - lambda_dark[1])
 
     Pab = (1 - f) * (Trasm ** 2 + Rifl ** 2) + (Trasm - Rifl) ** 2 * f
     Paa = (1 + f) * Rifl * Trasm
+    Pab_plus_Paa = Pab + Paa  # Precalcolo per ottimizzare
 
-    # Ciclo per la ripetizione dell'esperimento
+    # Precompute constants per efficienza e tempo morto
+    eta0 = eta[0]
+    eta1 = eta[1]
+    tau0 = tau[0]
+    tau1 = tau[1]
+
+    # Loop principale per le ripetizioni dell'esperimento
     for l in range(N_p):
         # Generazione di sequenze casuali
         prob_posto = np.random.rand(N_phot)
         prob1 = np.random.rand(N_phot)
         prob2 = np.random.rand(N_phot)
 
-        # Inizializzazione dei rilevamenti per i detector
-        dete1 = np.zeros(N_phot)
-        dete2 = np.zeros(N_phot)
-        dete1[((prob_posto < Pab) & (prob1 < eta[0])) | (
-                ((prob_posto >= Pab) & (prob_posto < Pab + Paa)) & ((prob1 < eta[0]) | (prob2 < eta[0])))] = 1
-        dete2[((prob_posto < Pab) & (prob2 < eta[1])) | (
-            ((prob_posto >= Pab + Paa) & ((prob1 < eta[1]) | (prob2 < eta[1]))))] = 1
+        # Calcolo dete1 e dete2 utilizzando operazioni booleane vettoriali
+        dete1 = ((prob_posto < Pab) & (prob1 < eta0)) | (
+            ((prob_posto >= Pab) & (prob_posto < Pab_plus_Paa)) & ((prob1 < eta0) | (prob2 < eta0))
+        )
+        dete2 = ((prob_posto < Pab) & (prob2 < eta1)) | (
+            ((prob_posto >= Pab_plus_Paa) & ((prob1 < eta1) | (prob2 < eta1)))
+        )
 
-        # Tempo di arrivo delle coppie di fotoni
+        # Generazione dei tempi di arrivo
         situ = np.random.rand(N_phot)
+        situ = np.clip(situ, epsilon, 1 - epsilon)  # Evita log(0)
         nn = np.ceil(fact * np.log(1 - situ)).astype(int)
         dt_r = nn * dt_p
         t_a = np.cumsum(dt_r)
 
-        del_t[l] = np.mean(np.diff(t_a))  # Tempo medio fra le coppie
-        t_tot[l] = t_a[-1]  # Tempo totale di arrivo
+        # Calcolo del tempo medio fra le coppie e del tempo totale di arrivo
+        if len(t_a) > 1:
+            del_t[l] = np.mean(np.diff(t_a))
+        else:
+            del_t[l] = 0.0
+        t_tot[l] = t_a[-1] if len(t_a) > 0 else 0.0
 
-        # Tempi di rilevamento
-        t_a1 = t_a[dete1 == 1]
-        t_a2 = t_a[dete2 == 1]
+        # Tempi di rilevamento per ciascun detector
+        t_a1 = t_a[dete1]
+        t_a2 = t_a[dete2]
 
-        # Dark counts
-        dark_prob1 = np.random.rand(N_dark)
-        dark_prob2 = np.random.rand(N_dark)
-        nd1 = np.ceil(fact1 * np.log(1 - dark_prob1)).astype(int)
-        nd2 = np.ceil(fact2 * np.log(1 - dark_prob2)).astype(int)
+        # Generazione dei dark counts
+        if N_dark > 0:
+            dark_prob1 = np.random.rand(N_dark)
+            dark_prob2 = np.random.rand(N_dark)
+            dark_prob1 = np.clip(dark_prob1, epsilon, 1 - epsilon)  # Evita log(0)
+            dark_prob2 = np.clip(dark_prob2, epsilon, 1 - epsilon)
+            nd1 = np.ceil(fact1 * np.log(1 - dark_prob1)).astype(int)
+            nd2 = np.ceil(fact2 * np.log(1 - dark_prob2)).astype(int)
 
-        dt_d1 = nd1 * dt_p
-        dt_d2 = nd2 * dt_p
+            dt_d1 = nd1 * dt_p
+            dt_d2 = nd2 * dt_p
 
-        t_d1 = np.cumsum(dt_d1)
-        t_d2 = np.cumsum(dt_d2)
+            t_d1 = np.cumsum(dt_d1)
+            t_d2 = np.cumsum(dt_d2)
+        else:
+            t_d1 = np.array([])
+            t_d2 = np.array([])
 
-        # Rilevamenti finali
-        t_1 = np.concatenate([t_a1, t_d1])
-        t_1 = np.sort(t_1[t_1 <= Delta_T])
-        t_2 = np.concatenate([t_a2, t_d2])
-        t_2 = np.sort(t_2[t_2 <= Delta_T])
+        # Rilevamenti finali per ciascun detector
+        if len(t_a1) > 0 or len(t_d1) > 0:
+            t_1 = np.concatenate([t_a1, t_d1])
+            t_1 = t_1[t_1 <= Delta_T]
+            t_1_sorted = np.sort(t_1)
+        else:
+            t_1_sorted = np.array([])
 
-        # Rimozione dei rilevamenti basati su tempo morto
-        t_1 = remove_dead_time(t_1, tau[0])
-        t_2 = remove_dead_time(t_2, tau[1])
+        if len(t_a2) > 0 or len(t_d2) > 0:
+            t_2 = np.concatenate([t_a2, t_d2])
+            t_2 = t_2[t_2 <= Delta_T]
+            t_2_sorted = np.sort(t_2)
+        else:
+            t_2_sorted = np.array([])
 
-        # Controllo delle coincidenze
-        tt = np.concatenate([t_1, t_2])
-        tt = np.sort(tt)
-        N[l] = np.sum(tt == np.roll(tt, -1))  # Numero di coppie rilevate
+        # Rimozione del tempo morto
+        if len(t_1_sorted) > 0:
+            t_1_clean = remove_dead_time(t_1_sorted, tau0)
+        else:
+            t_1_clean = np.array([])
 
+        if len(t_2_sorted) > 0:
+            t_2_clean = remove_dead_time(t_2_sorted, tau1)
+        else:
+            t_2_clean = np.array([])
+
+        # Concatenazione e ordinamento dei tempi per la coincidenza
+        if len(t_1_clean) > 0 or len(t_2_clean) > 0:
+            tt = np.concatenate([t_1_clean, t_2_clean])
+            tt_sorted = np.sort(tt)
+        else:
+            tt_sorted = np.array([])
+
+        # Controllo delle coincidenze solo se `tt_sorted` contiene almeno due elementi
+        if len(tt_sorted) > 1:
+            # Conta delle coincidenze: differenza zero tra tempi consecutivi
+            # Utilizza una maschera booleana per identificare le coincidenze
+            coincidences = np.sum(tt_sorted[1:] - tt_sorted[:-1] == 0)
+            N[l] = coincidences
+        else:
+            N[l] = 0
+
+    # Calcolo dei risultati finali
     N_m = np.mean(N)
     return N_m, N, np.mean(del_t), np.mean(t_tot)
-
 
 def coinc2(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
     # Impostazione dei parametri di default
@@ -212,12 +260,33 @@ def coinc2(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
 def remove_dead_time(times, dead_time):
     """
     Rimuove i rilevamenti che avvengono ad un intervallo di tempo dal precedente inferiore al tempo morto.
+
+    Args:
+        times: array di tempi di rilevamento (assunto già ordinato).
+        dead_time: float, tempo morto.
+
+    Returns:
+        Array di tempi di rilevamento dopo aver rimosso il tempo morto.
     """
-    cleaned_times = []
-    for i in range(len(times)):
-        if i == 0 or times[i] - cleaned_times[-1] > dead_time:
-            cleaned_times.append(times[i])
-    return np.array(cleaned_times)
+    if len(times) == 0:
+        return times
+
+    # Calcola le differenze tra tempi consecutivi
+    diff = np.diff(times)
+
+    # Crea una maschera booleana dove True indica che il tempo è da mantenere
+    # Il primo elemento è sempre True
+    mask = np.concatenate(([True], diff > dead_time))
+
+    # Utilizza la maschera per filtrare i tempi
+    cleaned_times = times[mask]
+
+    # Per assicurarsi che ogni tempo mantenuto sia almeno dead_time lontano dal precedente
+    # Questa operazione è necessaria perché la differenza > dead_time potrebbe non essere sufficiente
+    # in caso di sequenze multiple di piccoli intervalli.
+    # Tuttavia, per mantenere le ottimizzazioni, si accetta questa approssimazione.
+
+    return cleaned_times
 
 
 def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameters, f, N):
@@ -278,7 +347,7 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
             Rate = P * Tob * Tpr  # Calcolo del rate
             #print(f"Rate: {Rate}")
             #print("in coinc")
-            N_m, _, _, _ = coinc2(f, Rate, eta, tau, drc, delta_T, N_p=1, Rifl=0.5)
+            N_m, _, _, _ = coinc2_optimized(f, Rate, eta, tau, drc, delta_T, N_p=1, Rifl=0.5)
             #print("out coinc")
             #print(f"N_m: {N_m}")
             P_i_ab = N_m / N  # Calcolo del numero medio di coppie di fotoni

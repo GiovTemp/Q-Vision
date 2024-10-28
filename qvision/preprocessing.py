@@ -1,10 +1,9 @@
 
-
 import numpy as np
 
 def rgb2gray(rgb):
     """Convert an RGB digital image to grayscale."""
-    return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
+    return np.dot(rgb[... ,:3], [0.2989, 0.5870, 0.1140])
 
 def convert_to_float(images, labels):
     """Convert images and labels to float64."""
