@@ -9,8 +9,7 @@ setup(
         'numpy',
         'matplotlib',
         'seaborn',
-        'tabulate',
-        'cupy'
+        'tabulate'
     ],
     url='https://github.com/GiovTemp/Q-Vision',
     license='MIT',
