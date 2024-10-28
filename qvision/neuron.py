@@ -2,6 +2,7 @@
 
 import collections
 import numpy as np
+import cupy as cp
 from typing import Callable
 
 from .utils import sig, sigPrime, loss, accuracy
@@ -17,15 +18,15 @@ class QuantumNeuron:
             weights and bias, and input Img. The predicted probability is sampled
             for a given number of shots (deactived by choosing shots = -1). """
 
-        norm = np.sqrt(np.sum(np.square(weights)))
-        prob = np.abs(np.sum(np.multiply(Img, weights / norm))) ** 2
+        norm = cp.sqrt(cp.sum(cp.square(weights)))  # Usa cp
+        prob = cp.abs(cp.sum(cp.multiply(Img, weights / norm))) ** 2  # Usa cp
 
         if num_shots == -1:
             f = prob
             f_i, self.N = calculate_f_i(weights, Img, 1, ideal_conditions, non_ideal_parameters, f, self.N)
         else:
-            samples = np.random.choice([0, 1], num_shots, p=[1 - prob, prob])
-            counter = collections.Counter(samples)
+            samples = cp.random.choice([0, 1], num_shots, p=[1 - prob, prob])
+            counter = collections.Counter(samples.get())
             f = counter[1] / num_shots
             f_i, self.N = calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameters, f, self.N)
 
