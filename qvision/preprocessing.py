@@ -10,19 +10,23 @@ def convert_to_float(images, labels):
 
 def convert_and_normalize(images):
     """Convert images to grayscale and normalize them."""
-    for idx in range(images.shape[0]):  # Cambiato per lavorare con gli indici di CuPy
+    # Assicurati che le immagini siano in CuPy
+    images = cp.asarray(images)
+
+    for idx in range(images.shape[0]):
         img = images[idx]
-        if len(images.shape) == 4:  # Controllo se le immagini hanno una dimensione di 4 (batch con canale)
+        # Controlla se l'immagine è RGB
+        if img.ndim == 3 and img.shape[2] == 3:  # Controllo per immagini RGB
             img_gray = rgb2gray(img)
-            images[idx, :, :, 0] = img_gray / cp.sum(img_gray)  # Usa cp.sum invece di np.sum
-        else:
-            img_gray = img
-            images[idx, :, :] = img_gray / cp.sum(img_gray)  # Usa cp.sum invece di np.sum
+            images[idx, :, :, 0] = img_gray / cp.sum(img_gray) if cp.sum(img_gray) > 0 else img_gray  # Evita divisione per zero
+        elif img.ndim == 2:  # Immagine già in scala di grigi
+            images[idx, :, :] = img / cp.sum(img) if cp.sum(img) > 0 else img  # Evita divisione per zero
     return images
 
 def calculate_amplitudes(images):
     """Calculate amplitudes of the images."""
+    images = cp.asarray(images)  # Assicurati che siano array CuPy
     if len(images.shape) == 4:  # Controllo per batch con canale
-        return cp.sqrt(images[:, :, :, 0])  # Usa cp.sqrt invece di np.sqrt
+        return cp.sqrt(images[:, :, :, 0])  # Usa cp.sqrt
     else:
-        return cp.sqrt(images[:, :, :])  # Usa cp.sqrt invece di np.sqrt
+        return cp.sqrt(images[:, :, :])  # Usa cp.sqrt
