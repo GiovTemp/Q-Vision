@@ -80,8 +80,8 @@ class QVision:
         test_imgs = calculate_amplitudes(test_imgs)
         return train_imgs, train_labels, test_imgs, test_labels
 
-    def train(self, optimizer_name, train_imgs, train_labels, test_imgs, test_labels, train_source_images, train_modulated_images, train_labels1,
-          test_source_images, test_modulated_images, test_labels1, phase_modulation=False):
+    def train(self, optimizer_name, train_imgs, train_labels, test_imgs, test_labels, train_source_images=None, train_modulated_images=None, train_labels1=None,
+          test_source_images=None, test_modulated_images=None, test_labels1=None, phase_modulation=False):
         self.weights, self.bias, self.loss_history, self.test_loss_history, self.accuracy_history, self.test_accuracy_history = train(
             optimizer_name, self.weights, self.bias, train_imgs, train_labels, test_imgs, test_labels, self.num_epochs, train_source_images, train_modulated_images, train_labels1,
           test_source_images, test_modulated_images, test_labels1, self.lr_weights, self.lr_bias, self.num_shots, self.momentum, self.batch_size, self.ideal_conditions,
