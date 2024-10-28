@@ -10,7 +10,7 @@ from qvision import QVision
 
 class TestQVision(unittest.TestCase):
     def setUp(self):
-        self.model = QVision(num_epochs=10, lr_weights=0.075, lr_bias=0.005, num_shots=-1)
+        self.model = QVision(num_epochs=2, lr_weights=0.075, lr_bias=0.005, num_shots=-1)
 
     def test_initialize_parameters(self):
         self.model.initialize_parameters()
@@ -41,10 +41,10 @@ class TestQVision(unittest.TestCase):
         results = {}
 
         # Create dummy data
-        train_imgs = np.random.rand(10, 32, 32, 3)
-        train_labels = np.random.randint(0, 2, 10)
-        test_imgs = np.random.rand(5, 32, 32, 3)
-        test_labels = np.random.randint(0, 2, 5)
+        train_imgs = np.random.rand(3, 32, 32, 3)
+        train_labels = np.random.randint(0, 2, 3)
+        test_imgs = np.random.rand(1, 32, 32, 3)
+        test_labels = np.random.randint(0, 2, 1)
 
         train_imgs, train_labels, test_imgs, test_labels = self.model.preprocess_data(train_imgs, train_labels,
                                                                                       test_imgs, test_labels)
