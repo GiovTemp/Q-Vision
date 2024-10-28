@@ -277,9 +277,9 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
             #print(f"deltaT: {delta_T}")
             Rate = P * Tob * Tpr  # Calcolo del rate
             #print(f"Rate: {Rate}")
-            print("in coinc")
+            #print("in coinc")
             N_m, _, _, _ = coinc2(f, Rate, eta, tau, drc, delta_T, N_p=1, Rifl=0.5)
-            print("out coinc")
+            #print("out coinc")
             #print(f"N_m: {N_m}")
             P_i_ab = N_m / N  # Calcolo del numero medio di coppie di fotoni
             #print(f"P_i_ab: {P_i_ab}")
