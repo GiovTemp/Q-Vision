@@ -274,142 +274,197 @@ def optimizer(optimizer_function, loss_derivative: Callable, weights, bias, targ
 
 
 def common_optimization(
-        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        train_source_images,
-        train_modulated_images, train_labels,
-        test_source_images, test_modulated_images, test_labels, lrWeights, lrBias, num_shots,
-        update_fn: Callable, ideal_conditions, non_ideal_parameters, phase_modulation, **kwargs
+    loss_derivative: Callable,
+    weights: np.ndarray,
+    bias: np.ndarray,
+    targets: np.ndarray,
+    test_targets: np.ndarray,
+    trainImgs: np.ndarray,
+    testImgs: np.ndarray,
+    num_epochs: int,
+    train_source_images: np.ndarray,
+    train_modulated_images: np.ndarray,
+    train_labels: np.ndarray,
+    test_source_images: np.ndarray,
+    test_modulated_images: np.ndarray,
+    test_labels: np.ndarray,
+    lrWeights: float,
+    lrBias: float,
+    num_shots: int,
+    update_fn: Callable,
+    ideal_conditions,
+    non_ideal_parameters,
+    phase_modulation: bool,
+    **kwargs
 ):
     """Common optimization loop with handling for complex numbers due to phase modulation and multiple optimizers."""
 
-    # History initialization
-
+    # Inizializzazione delle storie
     loss_history = []
     accuracy_history = []
-
     test_loss_history = []
     test_accuracy_history = []
 
-    # Cache initialization for momentum or other optimizers that need cache
+    # Inizializzazione della cache per gli ottimizzatori che ne hanno bisogno
     cache = kwargs.get('cache', {})
     momentum = kwargs.get('momentum', 0.9)
 
-    # Inizializza la classe QuantumNeuron una sola volta
+    # Inizializzazione del modello una sola volta
     neuron_model = QuantumNeuron()
 
+    # Determinazione della dimensione del batch e delle etichette in base alla modulazione di fase
     if phase_modulation:
-        # Retrieve batch size from kwargs, default to full-batch if not specified
         training_images_length = train_modulated_images.shape[0]
         test_images_length = test_modulated_images.shape[0]
-        batch_size = kwargs.get('batch_size', training_images_length)
-        trainlabels = train_labels
-        testlabels = test_labels
+        train_labels_used = train_labels
+        test_labels_used = test_labels
+        train_inputs = train_modulated_images
+        test_inputs = test_modulated_images
     else:
-        # Retrieve batch size from kwargs, default to full-batch if not specified
         training_images_length = trainImgs.shape[0]
         test_images_length = testImgs.shape[0]
-        batch_size = kwargs.get('batch_size', training_images_length)
-        trainlabels = targets
-        testlabels = test_targets
+        train_labels_used = targets
+        test_labels_used = test_targets
+        train_inputs = trainImgs
+        test_inputs = testImgs
+
+    # Recupero della dimensione del batch da kwargs, default al full-batch
+    batch_size = kwargs.get('batch_size', training_images_length)
 
     for epoch in range(num_epochs):
-        # Shuffle if using mini-batch or SGD, keep order for standard GD
+        # Shuffle degli indici se si utilizza mini-batch o SGD
         indices = np.arange(training_images_length)
-        if batch_size < training_images_length:  # Only shuffle for mini-batch or SGD
+        if batch_size < training_images_length:
             np.random.shuffle(indices)
 
-        # Divide into batches
+        # Divisione in batch
         for start_idx in range(0, training_images_length, batch_size):
             end_idx = start_idx + batch_size
             batch_indices = indices[start_idx:end_idx]
 
+            # Inizializzazione delle liste per accumulare i gradienti del batch
             batch_lossWeightDerivatives = []
             batch_lossBiasDerivatives = []
 
-            # Calculate gradients for each sample in batch
+            # Iterazione sui campioni del batch
             for idx in batch_indices:
+                # Calcolo dell'output del neurone
                 if phase_modulation:
-                    output = neuron_model.neuron_phase_modulation(weights, bias, train_modulated_images[idx, :, :],
-                                                                  num_shots)
+                    output = neuron_model.neuron_phase_modulation(
+                        weights,
+                        bias,
+                        train_inputs[idx, :, :],
+                        num_shots
+                    )
 
-                    # Compute loss derivatives with respect to weights and bias
+                    # Calcolo dei derivati della loss rispetto a weights e bias
                     lossWeightDerivative, lossBiasDerivative = pm_spatial_loss_derivative(
-                        np.abs(output), trainlabels[idx], train_source_images[idx, :, :],
-                        train_modulated_images[idx, :, :], weights, bias
+                        np.abs(output),
+                        train_labels_used[idx],
+                        train_source_images[idx, :, :],
+                        train_modulated_images[idx, :, :],
+                        weights,
+                        bias
                     )
                 else:
-                    output = neuron_model.neuron(weights, bias, trainImgs[idx, :, :], num_shots, ideal_conditions,
-                                                 non_ideal_parameters)
-
-                    # Compute loss derivatives with respect to weights and bias
-                    lossWeightDerivative, lossBiasDerivative = loss_derivative(
-                        np.abs(output), trainlabels[idx], weights, bias, trainImgs[idx, :, :]
+                    output = neuron_model.neuron(
+                        weights,
+                        bias,
+                        train_inputs[idx, :, :],
+                        num_shots,
+                        ideal_conditions,
+                        non_ideal_parameters
                     )
 
-                # print('lossWeightDerivative:', lossWeightDerivative)
-                # print('lossBiasDerivative:', lossBiasDerivative)
+                    # Calcolo dei derivati della loss rispetto a weights e bias
+                    lossWeightDerivative, lossBiasDerivative = loss_derivative(
+                        np.abs(output),
+                        train_labels_used[idx],
+                        weights,
+                        bias,
+                        train_inputs[idx, :, :]
+                    )
+
+                # Accumulo dei gradienti per il batch (usato per GD e mini-batch GD)
                 batch_lossWeightDerivatives.append(lossWeightDerivative)
                 batch_lossBiasDerivatives.append(lossBiasDerivative)
 
+                # Aggiornamento immediato per SGD e SGD con Momentum
                 if update_fn == sgd_update:
                     weights, bias, cache = update_fn(
-                        weights, bias, lossWeightDerivative, lossBiasDerivative, lrWeights, lrBias, cache
+                        weights,
+                        bias,
+                        lossWeightDerivative,
+                        lossBiasDerivative,
+                        lrWeights,
+                        lrBias,
+                        cache
                     )
                 elif update_fn == sgd_momentum_update:
                     weights, bias, cache = update_fn(
-                        weights, bias, lossWeightDerivative, lossBiasDerivative, lrWeights, lrBias, cache, momentum
-                    )
-                elif batch_size > 1 and batch_size < training_images_length and update_fn == standard_gd_update:
-                    weights, bias, cache = update_fn(
-                        weights, bias, batch_lossWeightDerivatives, batch_lossBiasDerivatives, lrWeights, lrBias, cache
+                        weights,
+                        bias,
+                        lossWeightDerivative,
+                        lossBiasDerivative,
+                        lrWeights,
+                        lrBias,
+                        cache,
+                        momentum
                     )
 
-            # Update weights and biases
-            if update_fn == standard_gd_update and batch_size == training_images_length:
+            # Dopo aver processato il batch, aggiorna per GD o mini-batch GD
+            if update_fn == standard_gd_update:
+                # Se è standard GD, batch_size dovrebbe essere == training_images_length
+                # In caso di mini-batch GD, batch_size < training_images_length
                 weights, bias, cache = update_fn(
-                    weights, bias, batch_lossWeightDerivatives, batch_lossBiasDerivatives, lrWeights, lrBias, cache
+                    weights,
+                    bias,
+                    batch_lossWeightDerivatives,
+                    batch_lossBiasDerivatives,
+                    lrWeights,
+                    lrBias,
+                    cache
                 )
 
-        # Calculate losses and accuracy after each epoch
+        # Calcolo delle perdite e dell'accuratezza dopo ogni epoca
+        # Calcolo delle predizioni per il training set
         if phase_modulation:
             outputs = np.array([
-                neuron_model.neuron_phase_modulation(weights, bias, train_modulated_images[idx, :, :], num_shots)
+                neuron_model.neuron_phase_modulation(weights, bias, train_inputs[idx, :, :], num_shots)
                 for idx in range(training_images_length)
             ], dtype=np.complex128)
         else:
             outputs = np.array([
-                neuron_model.neuron(weights, bias, trainImgs[idx, :, :], num_shots, ideal_conditions,
-                                    non_ideal_parameters)
+                neuron_model.neuron(weights, bias, train_inputs[idx, :, :], num_shots, ideal_conditions, non_ideal_parameters)
                 for idx in range(training_images_length)
             ])
 
-        # Calculate training loss and accuracy
-        losses = np.array([loss(np.abs(outputs[idx]), trainlabels[idx]) for idx in range(outputs.shape[0])])
+        # Calcolo della loss e dell'accuratezza per il training set
+        losses = np.array([loss(np.abs(outputs[idx]), train_labels_used[idx]) for idx in range(outputs.shape[0])])
         loss_history.append(np.mean(losses))
-        accuracy_history.append(accuracy(outputs, trainlabels))
+        accuracy_history.append(accuracy(outputs, train_labels_used))
 
-        # Calculate test losses and accuracy
+        # Calcolo delle predizioni per il test set
         if phase_modulation:
-            print("")
             test_outputs = np.array([
-                neuron_model.neuron_phase_modulation(weights, bias, test_modulated_images[idx, :, :], num_shots)
+                neuron_model.neuron_phase_modulation(weights, bias, test_inputs[idx, :, :], num_shots)
                 for idx in range(test_images_length)
             ], dtype=np.complex128)
         else:
             test_outputs = np.array([
-                neuron_model.neuron(weights, bias, testImgs[idx, :, :], num_shots, ideal_conditions,
-                                    non_ideal_parameters)
+                neuron_model.neuron(weights, bias, test_inputs[idx, :, :], num_shots, ideal_conditions, non_ideal_parameters)
                 for idx in range(test_images_length)
             ])
 
-        test_losses = np.array(
-            [loss(np.abs(test_outputs[idx]), testlabels[idx]) for idx in range(test_outputs.shape[0])])
+        # Calcolo della loss e dell'accuratezza per il test set
+        test_losses = np.array([loss(np.abs(test_outputs[idx]), test_labels_used[idx]) for idx in range(test_outputs.shape[0])])
         test_loss_history.append(np.mean(test_losses))
-        test_accuracy_history.append(accuracy(test_outputs, testlabels))
+        test_accuracy_history.append(accuracy(test_outputs, test_labels_used))
 
-        print('EPOCH', epoch + 1)
-        print('Loss', loss_history[-1], 'Val_Loss', test_loss_history[-1])
-        print('Accuracy', accuracy_history[-1], 'Val_Acc', test_accuracy_history[-1])
+        # Stampa dei risultati dell'epoca corrente
+        print(f'EPOCH {epoch + 1}')
+        print(f'Loss: {loss_history[-1]:.4f}, Val_Loss: {test_loss_history[-1]:.4f}')
+        print(f'Accuracy: {accuracy_history[-1]:.4f}, Val_Acc: {test_accuracy_history[-1]:.4f}')
         print('---')
 
     return weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history
