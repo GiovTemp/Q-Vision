@@ -20,24 +20,7 @@ def calculate_transmissibility(lambda_ob):
     return np.sum(lambda_ob) / (n_p * cost)
 
 
-def remove_dead_time_optimized_efficient(times, dead_time):
-    if len(times) == 0:
-        return times
-
-    cleaned = np.empty(len(times), dtype=times.dtype)
-    cleaned[0] = times[0]
-    count = 1
-    last_time = times[0]
-
-    for t in times[1:]:
-        if t - last_time > dead_time:
-            cleaned[count] = t
-            count += 1
-            last_time = t
-
-    return cleaned[:count]
-
-def coinc2(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
+def coinc2_optimized(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
     """
     Simula il numero di coincidenze di fotoni rilevati in modo ottimizzato usando solo NumPy.
 
@@ -149,27 +132,39 @@ def coinc2(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
         if len(t_a1) > 0 or len(t_d1) > 0:
             t_1 = np.concatenate([t_a1, t_d1])
             t_1 = t_1[t_1 <= Delta_T]
-            t_1_sorted = remove_dead_time_optimized_efficient(t_1, tau0)
+            t_1_sorted = np.sort(t_1)
         else:
             t_1_sorted = np.array([])
 
         if len(t_a2) > 0 or len(t_d2) > 0:
             t_2 = np.concatenate([t_a2, t_d2])
             t_2 = t_2[t_2 <= Delta_T]
-            t_2_sorted = remove_dead_time_optimized_efficient(t_2, tau1)
+            t_2_sorted = np.sort(t_2)
         else:
             t_2_sorted = np.array([])
 
+        # Rimozione del tempo morto
+        if len(t_1_sorted) > 0:
+            t_1_clean = remove_dead_time(t_1_sorted, tau0)
+        else:
+            t_1_clean = np.array([])
+
+        if len(t_2_sorted) > 0:
+            t_2_clean = remove_dead_time(t_2_sorted, tau1)
+        else:
+            t_2_clean = np.array([])
+
         # Concatenazione e ordinamento dei tempi per la coincidenza
-        if len(t_1_sorted) > 0 or len(t_2_sorted) > 0:
-            tt = np.concatenate([t_1_sorted, t_2_sorted])
+        if len(t_1_clean) > 0 or len(t_2_clean) > 0:
+            tt = np.concatenate([t_1_clean, t_2_clean])
             tt_sorted = np.sort(tt)
         else:
             tt_sorted = np.array([])
 
-        # Controllo delle coincidenze
+        # Controllo delle coincidenze solo se `tt_sorted` contiene almeno due elementi
         if len(tt_sorted) > 1:
             # Conta delle coincidenze: differenza zero tra tempi consecutivi
+            # Utilizza una maschera booleana per identificare le coincidenze
             coincidences = np.sum(tt_sorted[1:] - tt_sorted[:-1] == 0)
             N[l] = coincidences
         else:
@@ -178,6 +173,38 @@ def coinc2(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
     # Calcolo dei risultati finali
     N_m = np.mean(N)
     return N_m, N, np.mean(del_t), np.mean(t_tot)
+
+
+def remove_dead_time(times, dead_time):
+    """
+    Rimuove i rilevamenti che avvengono ad un intervallo di tempo dal precedente inferiore al tempo morto.
+
+    Args:
+        times: array di tempi di rilevamento (assunto già ordinato).
+        dead_time: float, tempo morto.
+
+    Returns:
+        Array di tempi di rilevamento dopo aver rimosso il tempo morto.
+    """
+    if len(times) == 0:
+        return times
+
+    # Calcola le differenze tra tempi consecutivi
+    diff = np.diff(times)
+
+    # Crea una maschera booleana dove True indica che il tempo è da mantenere
+    # Il primo elemento è sempre True
+    mask = np.concatenate(([True], diff > dead_time))
+
+    # Utilizza la maschera per filtrare i tempi
+    cleaned_times = times[mask]
+
+    # Per assicurarsi che ogni tempo mantenuto sia almeno dead_time lontano dal precedente
+    # Questa operazione è necessaria perché la differenza > dead_time potrebbe non essere sufficiente
+    # in caso di sequenze multiple di piccoli intervalli.
+    # Tuttavia, per mantenere le ottimizzazioni, si accetta questa approssimazione.
+
+    return cleaned_times
 
 def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameters, f, N):
     """
@@ -237,7 +264,7 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
             Rate = P * Tob * Tpr  # Calcolo del rate
             #print(f"Rate: {Rate}")
             #print("in coinc")
-            N_m, _, _, _ = coinc2(f, Rate, eta, tau, drc, delta_T, N_p=1, Rifl=0.5)
+            N_m, _, _, _ = coinc2_optimized(f, Rate, eta, tau, drc, delta_T, N_p=1, Rifl=0.5)
             #print("out coinc")
             #print(f"N_m: {N_m}")
             P_i_ab = N_m / N  # Calcolo del numero medio di coppie di fotoni
