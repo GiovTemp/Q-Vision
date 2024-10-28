@@ -25,4 +25,7 @@ def convert_and_normalize(images):
 
 def calculate_amplitudes(images):
     """Calculate amplitudes of the images."""
-    return np.sqrt(images[:, :, :, 0])
+    if len(images.shape) != 3:
+        return np.sqrt(images[:, :, :, 0])
+    else:
+        return np.sqrt(images[:, :, :])
