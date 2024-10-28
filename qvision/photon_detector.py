@@ -19,20 +19,23 @@ def calculate_transmissibility(lambda_ob):
     #print(f"Cost: {cost}")
     return np.sum(lambda_ob) / (n_p * cost)
 
-def remove_dead_time(times, dead_time):
+
+def remove_dead_time_optimized_efficient(times, dead_time):
     if len(times) == 0:
         return times
 
-    cleaned_times = [times[0]]
+    cleaned = np.empty(len(times), dtype=times.dtype)
+    cleaned[0] = times[0]
+    count = 1
     last_time = times[0]
 
     for t in times[1:]:
         if t - last_time > dead_time:
-            cleaned_times.append(t)
+            cleaned[count] = t
+            count += 1
             last_time = t
 
-    return np.array(cleaned_times)
-
+    return cleaned[:count]
 
 def coinc2(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
     """
@@ -100,7 +103,7 @@ def coinc2(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
 
         # Calcolo dete1 e dete2 utilizzando operazioni booleane vettoriali
         dete1 = ((prob_posto < Pab) & (prob1 < eta0)) | (
-                ((prob_posto >= Pab) & (prob_posto < Pab_plus_Paa)) & ((prob1 < eta0) | (prob2 < eta0))
+            ((prob_posto >= Pab) & (prob_posto < Pab_plus_Paa)) & ((prob1 < eta0) | (prob2 < eta0))
         )
         dete2 = ((prob_posto < Pab) & (prob2 < eta1)) | (
             ((prob_posto >= Pab_plus_Paa) & ((prob1 < eta1) | (prob2 < eta1)))
@@ -146,14 +149,14 @@ def coinc2(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
         if len(t_a1) > 0 or len(t_d1) > 0:
             t_1 = np.concatenate([t_a1, t_d1])
             t_1 = t_1[t_1 <= Delta_T]
-            t_1_sorted = remove_dead_time(t_1, tau0)
+            t_1_sorted = remove_dead_time_optimized_efficient(t_1, tau0)
         else:
             t_1_sorted = np.array([])
 
         if len(t_a2) > 0 or len(t_d2) > 0:
             t_2 = np.concatenate([t_a2, t_d2])
             t_2 = t_2[t_2 <= Delta_T]
-            t_2_sorted = remove_dead_time(t_2, tau1)
+            t_2_sorted = remove_dead_time_optimized_efficient(t_2, tau1)
         else:
             t_2_sorted = np.array([])
 
