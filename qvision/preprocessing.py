@@ -12,8 +12,9 @@ def convert_to_float(images, labels):
 
 def convert_and_normalize(images):
     """Convert images to grayscale and normalize them."""
+
     for idx, img in enumerate(images):
-        if images.shape != 3:
+        if len(images.shape) != 3:
             img_gray = rgb2gray(img)
             images[idx, :, :, 0] = img_gray / np.sum(img_gray)
         else:
