@@ -3,7 +3,7 @@
 import numpy as np
 from .preprocessing import convert_to_float, convert_and_normalize, calculate_amplitudes
 from .training import train
-
+import cupy as cp
 
 class QVision:
     def __init__(self, input_shape=(32, 32), num_epochs=150, lr_weights=0.075, lr_bias=0.005, num_shots=-1,
@@ -89,12 +89,12 @@ class QVision:
         return self.weights, self.bias, self.loss_history, self.test_loss_history, self.accuracy_history, self.test_accuracy_history
 
     @staticmethod
-    def initialize_weights(shape, low=0, high=1.0):
+    def initialize_weights(shape, low=-1.0, high=1.0):
         """Initialize weights with a uniform distribution."""
-        return np.random.uniform(low, high, shape)
+        return cp.random.uniform(low, high, shape)  # Usa cp invece di np
 
     @staticmethod
     def normalize_weights(weights):
         """Normalize the weights."""
-        norm = np.sum(np.square(weights))
-        return weights / np.sqrt(norm)
+        norm = cp.sum(cp.square(weights))  # Usa cp invece di np
+        return weights / cp.sqrt(norm)  # Usa cp invece di np
