@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 import sys
 import os
+from qvision.gerch_sax import load_train_test_images, load_images_from_directory
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -44,6 +45,17 @@ class TestQVision(unittest.TestCase):
         test_imgs = np.random.rand(5, 32, 32, 3)
         test_labels = np.random.randint(0, 2, 5)
 
+        # Define the folders where the images are stored
+        train_images_folder = '../qvision/training_images'
+        test_images_folder = '../qvision/test_images'
+
+        # Load the data
+        (train_source_images, train_modulated_images, train_labels), \
+        (test_source_images, test_modulated_images, test_labels) = load_train_test_images(train_images_folder, test_images_folder)
+
+        # Shuffle the training set (source images, modulated images, and labels)
+        # train_source_images, train_modulated_images, train_labels = shuffle_dataset(train_source_images, train_modulated_images, train_labels)
+
         train_imgs, train_labels, test_imgs, test_labels = self.model.preprocess_data(train_imgs, train_labels,
                                                                                       test_imgs, test_labels)
 
@@ -52,7 +64,8 @@ class TestQVision(unittest.TestCase):
         for optimizer in optimizers:
             print(f'Training with {optimizer} optimizer...')
             weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history = self.model.train(
-                optimizer, train_imgs, train_labels, test_imgs, test_labels)
+                optimizer, None, None, None, None, train_source_images, train_modulated_images,
+                train_labels, test_source_images, test_modulated_images, test_labels, phase_modulation=True)
             results[optimizer] = {
                 'weights': weights,
                 'bias': bias,
