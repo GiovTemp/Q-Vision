@@ -31,7 +31,8 @@ class QuantumNeuron:
 
         return sig(f_i + bias)
 
-    def neuron_phase_modulation(self, weights, bias, modulated_image, num_shots, alfa=385, beta=5.3, max_iterations=100):
+    def neuron_phase_modulation(self, weights, bias, modulated_image, num_shots, alfa=385, beta=5.3,
+                                max_iterations=100):
         # Normalize modulated image
         modulated_image = modulated_image / np.linalg.norm(modulated_image)
 
@@ -243,7 +244,6 @@ def optimizer(optimizer_function, loss_derivative: Callable, weights, bias, targ
               num_epochs, train_source_images, train_modulated_images, train_labels, test_source_images,
               test_modulated_images, test_labels, lrWeights, lrBias, num_shots, momentum,
               batch_size, ideal_conditions, non_ideal_parameters, phase_modulation, **kwargs):
-
     if optimizer_function == 'gd':
         return optimization_standard_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs,
                                         num_epochs, train_source_images, train_modulated_images, train_labels,
@@ -274,7 +274,8 @@ def optimizer(optimizer_function, loss_derivative: Callable, weights, bias, targ
 
 
 def common_optimization(
-        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, train_source_images,
+        loss_derivative: Callable, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
+        train_source_images,
         train_modulated_images, train_labels,
         test_source_images, test_modulated_images, test_labels, lrWeights, lrBias, num_shots,
         update_fn: Callable, ideal_conditions, non_ideal_parameters, phase_modulation, **kwargs
@@ -328,7 +329,8 @@ def common_optimization(
             # Calculate gradients for each sample in batch
             for idx in batch_indices:
                 if phase_modulation:
-                    output = neuron_model.neuron_phase_modulation(weights, bias, train_modulated_images[idx, :, :], num_shots)
+                    output = neuron_model.neuron_phase_modulation(weights, bias, train_modulated_images[idx, :, :],
+                                                                  num_shots)
 
                     # Compute loss derivatives with respect to weights and bias
                     lossWeightDerivative, lossBiasDerivative = pm_spatial_loss_derivative(
@@ -346,6 +348,8 @@ def common_optimization(
 
                 # print('lossWeightDerivative:', lossWeightDerivative)
                 # print('lossBiasDerivative:', lossBiasDerivative)
+                batch_lossWeightDerivatives.append(lossWeightDerivative)
+                batch_lossBiasDerivatives.append(lossBiasDerivative)
 
                 if update_fn == sgd_update:
                     weights, bias, cache = update_fn(
@@ -355,12 +359,15 @@ def common_optimization(
                     weights, bias, cache = update_fn(
                         weights, bias, lossWeightDerivative, lossBiasDerivative, lrWeights, lrBias, cache, momentum
                     )
+                if batch_size > 1 and batch_size < training_images_length and update_fn == standard_gd_update:
+                    weights, bias, cache = update_fn(
+                        weights, bias, batch_lossWeightDerivatives, batch_lossBiasDerivatives, lrWeights, lrBias, cache
+                    )
 
-                batch_lossWeightDerivatives.append(lossWeightDerivative)
-                batch_lossBiasDerivatives.append(lossBiasDerivative)
+
 
             # Update weights and biases
-            if update_fn == standard_gd_update:
+            if update_fn == standard_gd_update and batch_size == training_images_length:
                 weights, bias, cache = update_fn(
                     weights, bias, batch_lossWeightDerivatives, batch_lossBiasDerivatives, lrWeights, lrBias, cache
                 )
@@ -428,7 +435,9 @@ def sgd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWei
     # bias -= lrBias * lossBiasDerivatives
     return weights, bias, cache
 
-def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache, momentum=0.9):
+
+def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache,
+                        momentum=0.9):
     """Update rule for Stochastic Gradient Descent (SGD) with Momentum."""
 
     # Ensure derivatives are treated as at least 1D arrays
@@ -456,9 +465,11 @@ def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivativ
 
     return weights, bias, cache
 
+
 def clip_gradients(gradients, clip_value=1.0):
     gradients = np.clip(gradients, -clip_value, clip_value)
     return gradients
+
 
 def optimization_standard_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs,
                              num_epochs, train_source_images, train_modulated_images, train_labels, test_source_images,
@@ -476,7 +487,6 @@ def optimization_sgd(loss_derivative, weights, bias, targets, test_targets, trai
                      train_source_images, train_modulated_images, train_labels, test_source_images,
                      test_modulated_images, test_labels,
                      lrWeights, lrBias, num_shots, ideal_conditions, non_ideal_parameters, phase_modulation, **kwargs):
-
     kwargs['batch_size'] = 1
 
     return common_optimization(
@@ -491,13 +501,13 @@ def optimization_sgd_momentum(loss_derivative, weights, bias, targets, test_targ
                               test_modulated_images, test_labels, lrWeights, lrBias, num_shots, momentum,
                               ideal_conditions,
                               non_ideal_parameters, phase_modulation, **kwargs):
-
     kwargs['batch_size'] = 1
     kwargs['momentum'] = momentum
 
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs,
-        train_source_images, train_modulated_images, train_labels, test_source_images, test_modulated_images, test_labels,
+        train_source_images, train_modulated_images, train_labels, test_source_images, test_modulated_images,
+        test_labels,
         lrWeights, lrBias, num_shots, sgd_momentum_update, ideal_conditions, non_ideal_parameters,
         phase_modulation, **kwargs
     )
@@ -507,12 +517,12 @@ def optimization_minibatch_gd(loss_derivative, weights, bias, targets, test_targ
                               num_epochs, train_source_images, train_modulated_images, train_labels, test_source_images,
                               test_modulated_images, test_labels, lrWeights, lrBias, num_shots, batch_size,
                               ideal_conditions, non_ideal_parameters, phase_modulation, **kwargs):
-
     kwargs['batch_size'] = batch_size
 
     return common_optimization(
         loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs, num_epochs, train_source_images,
         train_modulated_images, train_labels, test_source_images,
         test_modulated_images, test_labels,
-        lrWeights, lrBias, num_shots, standard_gd_update, ideal_conditions, non_ideal_parameters, phase_modulation, **kwargs
+        lrWeights, lrBias, num_shots, standard_gd_update, ideal_conditions, non_ideal_parameters, phase_modulation,
+        **kwargs
     )
