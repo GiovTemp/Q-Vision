@@ -401,6 +401,7 @@ def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivativ
 
 
 def clip_gradients(gradients, clip_value=1.0):
+    gradients = cp.asarray(gradients)  # Converti a CuPy se non è già un array CuPy
     gradients = cp.clip(gradients, -clip_value, clip_value)  # Usa cp
     return gradients
 
