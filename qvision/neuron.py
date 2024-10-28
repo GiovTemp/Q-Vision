@@ -1,5 +1,5 @@
 import collections
-import cupy as cp  # Importing CuPy
+import cupy as cp
 from typing import Callable
 
 from .utils import sig, sigPrime, loss, accuracy
@@ -15,8 +15,12 @@ class QuantumNeuron:
             weights and bias, and input Img. The predicted probability is sampled
             for a given number of shots (deactivated by choosing shots = -1). """
 
-        norm = cp.sqrt(cp.sum(cp.square(weights)))  # Use cp
-        prob = cp.abs(cp.sum(cp.multiply(Img, weights / norm))) ** 2  # Use cp
+        # Assicurati che weights e Img siano array CuPy
+        weights = cp.asarray(weights)
+        Img = cp.asarray(Img)
+
+        norm = cp.sqrt(cp.sum(cp.square(weights)))  # Usa cp
+        prob = cp.abs(cp.sum(cp.multiply(Img, weights / norm))) ** 2  # Usa cp
 
         if num_shots == -1:
             f = prob
@@ -31,21 +35,23 @@ class QuantumNeuron:
 
     def neuron_phase_modulation(self, weights, bias, modulated_image, num_shots, alfa=385, beta=5.3,
                                 max_iterations=100):
-        # Normalize modulated image
-        modulated_image = modulated_image / cp.linalg.norm(modulated_image)  # Use cp.linalg.norm
+        # Normalizza modulated_image
+        modulated_image = cp.asarray(modulated_image)  # Converti in array CuPy
+        modulated_image = modulated_image / cp.linalg.norm(modulated_image)
 
-        # Compute weights phase
+        # Calcola il peso in fase
         N = weights.size
-        weights_phase = cp.exp(2 * cp.pi * 1j * weights) / cp.sqrt(N)  # Use cp
-        weights2 = cp.fft.fft2(weights_phase) / cp.sqrt(N)  # Use cp
+        weights = cp.asarray(weights)  # Assicurati che weights sia un array CuPy
+        weights_phase = cp.exp(2 * cp.pi * 1j * weights) / cp.sqrt(N)
+        weights2 = cp.fft.fft2(weights_phase) / cp.sqrt(N)
 
-        # Compute the overlap (inner product)
-        g = cp.sum(cp.multiply(modulated_image, cp.conj(weights2)))  # Use cp
-        prob = cp.abs(g) ** 2  # Equivalent to f = abs(g)^2 in MATLAB
+        # Calcola l'overlap (prodotto interno)
+        g = cp.sum(cp.multiply(modulated_image, cp.conj(weights2)))
+        prob = cp.abs(g) ** 2  # Equivalente a f = abs(g)^2 in MATLAB
 
-        # Calculate sigmoid function with alfa and beta as hyperparameters
+        # Calcola la funzione sigmoid
         sigmoid_input = -alfa * (prob + bias) + beta
-        sig_value = 1 / (1 + cp.exp(sigmoid_input))  # Use cp.exp
+        sig_value = 1 / (1 + cp.exp(sigmoid_input))
 
         if num_shots == -1:
             f = prob
@@ -71,7 +77,9 @@ def spatial_loss_derivative(output, target, weights, bias, Img):
     # Declarations
     F = output
     y = target
-    norm = cp.sqrt(cp.sum(cp.square(weights)))  # Use cp
+    weights = cp.asarray(weights)  # Assicurati che weights sia un array CuPy
+
+    norm = cp.sqrt(cp.sum(cp.square(weights)))
 
     # Compute the derivative with respect to the weights
     g = cp.sum(cp.multiply(Img, weights / norm))  # <I, U>
@@ -107,26 +115,26 @@ def pm_spatial_loss_derivative(output, target, source_image, modulated_image, we
     y = target  # The true label
 
     # Normalize the modulated image
-    modulated_image = modulated_image / cp.linalg.norm(modulated_image)  # Use cp.linalg.norm
+    modulated_image = modulated_image / cp.linalg.norm(modulated_image)
 
     # Phase calculations for weights
     N = weights.size
-    weights_phase = cp.exp(2 * cp.pi * 1j * weights) / cp.sqrt(N)  # Use cp
-    weights2 = cp.fft.fft2(weights_phase) / cp.sqrt(N)  # Use cp
+    weights_phase = cp.exp(2 * cp.pi * 1j * weights) / cp.sqrt(N)
+    weights2 = cp.fft.fft2(weights_phase) / cp.sqrt(N)
 
     # Compute g as the inner product between the modulated image and the conjugate of the weights
-    g = cp.sum(modulated_image * cp.conj(weights2))  # Use cp
+    g = cp.sum(modulated_image * cp.conj(weights2))
     f = cp.abs(g) ** 2  # f = |g|^2
 
     # Sigmoid computation
-    sig_value = 1 / (1 + cp.exp(-alfa * (f + bias) + beta))  # Use cp.exp
+    sig_value = 1 / (1 + cp.exp(-alfa * (f + bias) + beta))
 
     # Binary cross-entropy loss (H) computation
-    H = -y * cp.log(sig_value) - (1 - y) * cp.log(1 - sig_value)  # Use cp.log
+    H = -y * cp.log(sig_value) - (1 - y) * cp.log(1 - sig_value)
 
     # Calculate gradients
-    gPrime = -2 * cp.pi * 1j * source_image * cp.conj(weights_phase) * N  # Use cp
-    fPrime = 2 * cp.real(g * cp.conjugate(gPrime))  # Use cp
+    gPrime = -2 * cp.pi * 1j * source_image * cp.conj(weights_phase) * N
+    fPrime = 2 * cp.real(g * cp.conjugate(gPrime))
     sigPrime_value = sig_value * (1 - sig_value)
     HPrime = (sig_value - y) / (sig_value * (1 - sig_value))
 
@@ -150,7 +158,9 @@ def Fourier_loss_derivative(output, target, weights, bias, Img):
     # Declarations
     F = output
     y = target
-    norm = cp.sqrt(cp.sum(cp.square(weights)))  # Use cp
+    weights = cp.asarray(weights)  # Assicurati che weights sia un array CuPy
+
+    norm = cp.sqrt(cp.sum(cp.square(weights)))
 
     # Compute the derivative with respect to the weights
     g = cp.sum(cp.multiply(Img, weights / norm))  # <I, U>
@@ -243,9 +253,9 @@ def common_optimization(
 
     for epoch in range(num_epochs):
         # Shuffle if using mini-batch or SGD, keep order for standard GD
-        indices = cp.arange(training_images_length)  # Use cp
+        indices = cp.arange(training_images_length)  # Usa cp invece di np
         if batch_size < training_images_length:  # Only shuffle for mini-batch or SGD
-            cp.random.shuffle(indices)
+            cp.random.shuffle(indices)  # Usa cp invece di np
 
         # Divide into batches
         for start_idx in range(0, training_images_length, batch_size):
@@ -302,7 +312,7 @@ def common_optimization(
             outputs = cp.array([
                 neuron_model.neuron_phase_modulation(weights, bias, train_modulated_images[idx, :, :], num_shots)
                 for idx in range(training_images_length)
-            ], dtype=cp.complex128)  # Use cp
+            ], dtype=cp.complex128)
         else:
             outputs = cp.array([
                 neuron_model.neuron(weights, bias, trainImgs[idx, :, :], num_shots, ideal_conditions,
@@ -311,8 +321,8 @@ def common_optimization(
             ])
 
         # Calculate training loss and accuracy
-        losses = cp.array([loss(cp.abs(outputs[idx]), trainlabels[idx]) for idx in range(outputs.shape[0])])  # Use cp
-        loss_history.append(cp.mean(losses))  # Use cp
+        losses = cp.array([loss(cp.abs(outputs[idx]), trainlabels[idx]) for idx in range(outputs.shape[0])])
+        loss_history.append(cp.mean(losses))
         accuracy_history.append(accuracy(outputs, trainlabels))
 
         # Calculate test losses and accuracy
@@ -320,7 +330,7 @@ def common_optimization(
             test_outputs = cp.array([
                 neuron_model.neuron_phase_modulation(weights, bias, test_modulated_images[idx, :, :], num_shots)
                 for idx in range(test_images_length)
-            ], dtype=cp.complex128)  # Use cp
+            ], dtype=cp.complex128)
         else:
             test_outputs = cp.array([
                 neuron_model.neuron(weights, bias, testImgs[idx, :, :], num_shots, ideal_conditions,
@@ -329,8 +339,8 @@ def common_optimization(
             ])
 
         test_losses = cp.array(
-            [loss(cp.abs(test_outputs[idx]), testlabels[idx]) for idx in range(test_outputs.shape[0])])  # Use cp
-        test_loss_history.append(cp.mean(test_losses))  # Use cp
+            [loss(cp.abs(test_outputs[idx]), testlabels[idx]) for idx in range(test_outputs.shape[0])])
+        test_loss_history.append(cp.mean(test_losses))
         test_accuracy_history.append(accuracy(test_outputs, testlabels))
 
         print('EPOCH', epoch + 1)
@@ -346,8 +356,8 @@ def standard_gd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivative
     """ Parameters update rule of the gradient descent algorithm. """
     clipped_gradients_weights = clip_gradients(lossWeightsDerivatives)
     clipped_gradients_bias = clip_gradients(lossBiasDerivatives)
-    new_weights = weights - lrWeights * cp.mean(clipped_gradients_weights, axis=0)  # Use cp
-    new_bias = bias - lrBias * cp.mean(clipped_gradients_bias, axis=0)  # Use cp
+    new_weights = weights - lrWeights * cp.mean(clipped_gradients_weights, axis=0)  # Usa cp
+    new_bias = bias - lrBias * cp.mean(clipped_gradients_bias, axis=0)  # Usa cp
     return new_weights, new_bias, cache
 
 
@@ -365,12 +375,12 @@ def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivativ
     """Update rule for Stochastic Gradient Descent (SGD) with Momentum."""
 
     # Ensure derivatives are treated as at least 1D arrays
-    lossWeightsDerivatives = cp.atleast_1d(lossWeightsDerivatives)  # Use cp
-    lossBiasDerivatives = cp.atleast_1d(lossBiasDerivatives)  # Use cp
+    lossWeightsDerivatives = cp.atleast_1d(lossWeightsDerivatives)
+    lossBiasDerivatives = cp.atleast_1d(lossBiasDerivatives)
 
     # Retrieve previous velocities from the cache, or initialize if not present
-    velocity_weights = cache.get('velocity_weights', cp.zeros_like(weights))  # Use cp
-    velocity_bias = cache.get('velocity_bias', cp.zeros_like(bias))  # Use cp
+    velocity_weights = cache.get('velocity_weights', cp.zeros_like(weights))
+    velocity_bias = cache.get('velocity_bias', cp.zeros_like(bias))
 
     clipped_gradients_weights = clip_gradients(lossWeightsDerivatives)
     clipped_gradients_bias = clip_gradients(lossBiasDerivatives)
@@ -391,8 +401,7 @@ def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivativ
 
 
 def clip_gradients(gradients, clip_value=1.0):
-    gradients = cp.asarray(gradients)  # Converti a CuPy se non è già un array CuPy
-    gradients = cp.clip(gradients, -clip_value, clip_value)
+    gradients = cp.clip(gradients, -clip_value, clip_value)  # Usa cp
     return gradients
 
 
