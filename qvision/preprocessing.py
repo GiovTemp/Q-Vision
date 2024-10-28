@@ -15,9 +15,11 @@ def convert_and_normalize(images):
     for idx, img in enumerate(images):
         if images.shape != 3:
             img_gray = rgb2gray(img)
+            images[idx, :, :, 0] = img_gray / np.sum(img_gray)
         else:
             img_gray = img
-        images[idx, :, :, 0] = img_gray / np.sum(img_gray)
+            images[idx, :, :] = img_gray / np.sum(img_gray)
+
     return images
 
 def calculate_amplitudes(images):
