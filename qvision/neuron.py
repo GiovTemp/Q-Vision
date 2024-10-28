@@ -359,12 +359,10 @@ def common_optimization(
                     weights, bias, cache = update_fn(
                         weights, bias, lossWeightDerivative, lossBiasDerivative, lrWeights, lrBias, cache, momentum
                     )
-                if batch_size > 1 and batch_size < training_images_length and update_fn == standard_gd_update:
+                elif batch_size > 1 and batch_size < training_images_length and update_fn == standard_gd_update:
                     weights, bias, cache = update_fn(
                         weights, bias, batch_lossWeightDerivatives, batch_lossBiasDerivatives, lrWeights, lrBias, cache
                     )
-
-
 
             # Update weights and biases
             if update_fn == standard_gd_update and batch_size == training_images_length:
@@ -420,8 +418,10 @@ def common_optimization(
 # Define the standard gradient descent update function
 def standard_gd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache):
     """ Parameters update rule of the gradient descent algorithm. """
-    new_weights = weights - lrWeights * np.mean(lossWeightsDerivatives, axis=0)
-    new_bias = bias - lrBias * np.mean(lossBiasDerivatives, axis=0)
+    clipped_gradients_weights = clip_gradients(lossWeightsDerivatives)
+    clipped_gradients_bias = clip_gradients(lossBiasDerivatives)
+    new_weights = weights - lrWeights * np.mean(clipped_gradients_weights, axis=0)
+    new_bias = bias - lrBias * np.mean(clipped_gradients_bias, axis=0)
     return new_weights, new_bias, cache
 
 
@@ -517,6 +517,7 @@ def optimization_minibatch_gd(loss_derivative, weights, bias, targets, test_targ
                               num_epochs, train_source_images, train_modulated_images, train_labels, test_source_images,
                               test_modulated_images, test_labels, lrWeights, lrBias, num_shots, batch_size,
                               ideal_conditions, non_ideal_parameters, phase_modulation, **kwargs):
+
     kwargs['batch_size'] = batch_size
 
     return common_optimization(
