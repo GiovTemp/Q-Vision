@@ -1,5 +1,7 @@
 import numpy as np
 from .utils import print_parameters
+from numba import njit
+
 
 
 def calculate_transmissibility(lambda_ob):
@@ -174,37 +176,14 @@ def coinc2_optimized(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
     N_m = np.mean(N)
     return N_m, N, np.mean(del_t), np.mean(t_tot)
 
-
+# Funzione ottimizzata con Numba
+@njit
 def remove_dead_time(times, dead_time):
-    """
-    Rimuove i rilevamenti che avvengono ad un intervallo di tempo dal precedente inferiore al tempo morto.
-
-    Args:
-        times: array di tempi di rilevamento (assunto già ordinato).
-        dead_time: float, tempo morto.
-
-    Returns:
-        Array di tempi di rilevamento dopo aver rimosso il tempo morto.
-    """
-    if len(times) == 0:
-        return times
-
-    # Calcola le differenze tra tempi consecutivi
-    diff = np.diff(times)
-
-    # Crea una maschera booleana dove True indica che il tempo è da mantenere
-    # Il primo elemento è sempre True
-    mask = np.concatenate(([True], diff > dead_time))
-
-    # Utilizza la maschera per filtrare i tempi
-    cleaned_times = times[mask]
-
-    # Per assicurarsi che ogni tempo mantenuto sia almeno dead_time lontano dal precedente
-    # Questa operazione è necessaria perché la differenza > dead_time potrebbe non essere sufficiente
-    # in caso di sequenze multiple di piccoli intervalli.
-    # Tuttavia, per mantenere le ottimizzazioni, si accetta questa approssimazione.
-
-    return cleaned_times
+    cleaned_times = []
+    for i in range(len(times)):
+        if i == 0 or times[i] - cleaned_times[-1] > dead_time:
+            cleaned_times.append(times[i])
+    return np.array(cleaned_times)
 
 def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameters, f, N):
     """
