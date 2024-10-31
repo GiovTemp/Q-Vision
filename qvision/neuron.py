@@ -473,10 +473,10 @@ def common_optimization(
 # Define the standard gradient descent update function
 def standard_gd_update(weights, bias, lossWeightsDerivatives, lossBiasDerivatives, lrWeights, lrBias, cache):
     """ Parameters update rule of the gradient descent algorithm. """
-    clipped_gradients_weights = clip_gradients(lossWeightsDerivatives)
-    clipped_gradients_bias = clip_gradients(lossBiasDerivatives)
-    new_weights = weights - lrWeights * np.mean(clipped_gradients_weights, axis=0)
-    new_bias = bias - lrBias * np.mean(clipped_gradients_bias, axis=0)
+    #clipped_gradients_weights = clip_gradients(lossWeightsDerivatives)
+    #clipped_gradients_bias = clip_gradients(lossBiasDerivatives)
+    new_weights = weights - lrWeights * np.mean(lossWeightsDerivatives, axis=0)
+    new_bias = bias - lrBias * np.mean(lossBiasDerivatives, axis=0)
     return new_weights, new_bias, cache
 
 
