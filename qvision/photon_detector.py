@@ -1,6 +1,7 @@
 import numpy as np
 from .utils import print_parameters
-from numba import njit
+
+from .remove_dead_time import remove_dead_time_cython
 
 
 
@@ -20,7 +21,6 @@ def calculate_transmissibility(lambda_ob):
     cost = np.max([np.max(np.abs(lambda_ob)), 1])
     #print(f"Cost: {cost}")
     return np.sum(lambda_ob) / (n_p * cost)
-
 
 def coinc2_optimized(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
     """
@@ -147,12 +147,12 @@ def coinc2_optimized(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
 
         # Rimozione del tempo morto
         if len(t_1_sorted) > 0:
-            t_1_clean = remove_dead_time(t_1_sorted, tau0)
+            t_1_clean = remove_dead_time_cython(t_1_sorted, tau0)
         else:
             t_1_clean = np.array([])
 
         if len(t_2_sorted) > 0:
-            t_2_clean = remove_dead_time(t_2_sorted, tau1)
+            t_2_clean = remove_dead_time_cython(t_2_sorted, tau1)
         else:
             t_2_clean = np.array([])
 
@@ -176,14 +176,7 @@ def coinc2_optimized(f, Rate, eta, tau, dcr, Delta_T, N_p=100, Rifl=0.5):
     N_m = np.mean(N)
     return N_m, N, np.mean(del_t), np.mean(t_tot)
 
-# Funzione ottimizzata con Numba
-@njit
-def remove_dead_time(times, dead_time):
-    cleaned_times = []
-    for i in range(len(times)):
-        if i == 0 or times[i] - cleaned_times[-1] > dead_time:
-            cleaned_times.append(times[i])
-    return np.array(cleaned_times)
+
 
 def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameters, f, N):
     """
