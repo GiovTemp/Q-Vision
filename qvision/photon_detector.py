@@ -203,7 +203,7 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
         drc = non_ideal_parameters.get('drc', 0.0)  # Valore di drc, ma non utilizzato nell'algoritmo
         P = non_ideal_parameters.get('P', 0.0)
         C = non_ideal_parameters.get('C', 0.0)
-
+        N = non_ideal_parameters.get('N',1312.88)
         #print(f"eta: {eta}")
         #print(f"tau: {tau}")
         #print(f"drc: {drc}")
@@ -221,7 +221,7 @@ def calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameter
             #print(f"Rate: {Rate}")
             #N, _, _, _ = coinc2(0, Rate, eta, tau, drc, delta_T, N_p=100, Rifl=0.5)
             #print(f"N: {N}")
-            N = 1312.88
+
             f_i = 0  # Calcolo finale di f_i
             #print(f"f_i: {f_i}")
             # Ottengo il numero di rivelazioni totali

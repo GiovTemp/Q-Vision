@@ -28,7 +28,8 @@ class QVision:
             # vettore efficienza dei detector, ovvero rapporto fra il numero di fotoni rilevati sul numero di fotoni incidenti
             'tau': 0.0,  # vettore durata del tempo morto per i due detector (sec.)
             'drc': 0.0,  # manca nella funzione coinc
-            'P': 0.0  #flusso di coppia dei fotoni espresso in Hz
+            'P': 0.0, #flusso di coppia dei fotoni espresso in Hz
+            'N': 1312.88,
         }
 
     def set_hyperparameters(self, num_epochs=None, lr_weights=None, lr_bias=None, num_shots=None, momentum=None,

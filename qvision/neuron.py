@@ -11,6 +11,7 @@ from .photon_detector import calculate_f_i
 class QuantumNeuron:
     def __init__(self):
         self.N = 0  # Inizializza N solo al primo utilizzo
+        self.last_f = 0
 
     def neuron(self, weights, bias, Img, num_shots, ideal_conditions, non_ideal_parameters):
         """ Compute the output of the quantum optical neuron, with parameters
@@ -28,6 +29,11 @@ class QuantumNeuron:
             counter = collections.Counter(samples)
             f = counter[1] / num_shots
             f_i, self.N = calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameters, f, self.N)
+
+        if not ideal_conditions:
+            f_i = np.maximum(f_i, self.last_f)
+
+        self.last_f = f_i
 
         return sig(f_i + bias)
 
@@ -274,28 +280,28 @@ def optimizer(optimizer_function, loss_derivative: Callable, weights, bias, targ
 
 
 def common_optimization(
-    loss_derivative: Callable,
-    weights: np.ndarray,
-    bias: np.ndarray,
-    targets: np.ndarray,
-    test_targets: np.ndarray,
-    trainImgs: np.ndarray,
-    testImgs: np.ndarray,
-    num_epochs: int,
-    train_source_images: np.ndarray,
-    train_modulated_images: np.ndarray,
-    train_labels: np.ndarray,
-    test_source_images: np.ndarray,
-    test_modulated_images: np.ndarray,
-    test_labels: np.ndarray,
-    lrWeights: float,
-    lrBias: float,
-    num_shots: int,
-    update_fn: Callable,
-    ideal_conditions,
-    non_ideal_parameters,
-    phase_modulation: bool,
-    **kwargs
+        loss_derivative: Callable,
+        weights: np.ndarray,
+        bias: np.ndarray,
+        targets: np.ndarray,
+        test_targets: np.ndarray,
+        trainImgs: np.ndarray,
+        testImgs: np.ndarray,
+        num_epochs: int,
+        train_source_images: np.ndarray,
+        train_modulated_images: np.ndarray,
+        train_labels: np.ndarray,
+        test_source_images: np.ndarray,
+        test_modulated_images: np.ndarray,
+        test_labels: np.ndarray,
+        lrWeights: float,
+        lrBias: float,
+        num_shots: int,
+        update_fn: Callable,
+        ideal_conditions,
+        non_ideal_parameters,
+        phase_modulation: bool,
+        **kwargs
 ):
     """Common optimization loop with handling for complex numbers due to phase modulation and multiple optimizers."""
 
@@ -435,7 +441,8 @@ def common_optimization(
             ], dtype=np.complex128)
         else:
             outputs = np.array([
-                neuron_model.neuron(weights, bias, train_inputs[idx, :, :], num_shots, ideal_conditions, non_ideal_parameters)
+                neuron_model.neuron(weights, bias, train_inputs[idx, :, :], num_shots, ideal_conditions,
+                                    non_ideal_parameters)
                 for idx in range(training_images_length)
             ])
 
@@ -452,12 +459,14 @@ def common_optimization(
             ], dtype=np.complex128)
         else:
             test_outputs = np.array([
-                neuron_model.neuron(weights, bias, test_inputs[idx, :, :], num_shots, ideal_conditions, non_ideal_parameters)
+                neuron_model.neuron(weights, bias, test_inputs[idx, :, :], num_shots, ideal_conditions,
+                                    non_ideal_parameters)
                 for idx in range(test_images_length)
             ])
 
         # Calcolo della loss e dell'accuratezza per il test set
-        test_losses = np.array([loss(np.abs(test_outputs[idx]), test_labels_used[idx]) for idx in range(test_outputs.shape[0])])
+        test_losses = np.array(
+            [loss(np.abs(test_outputs[idx]), test_labels_used[idx]) for idx in range(test_outputs.shape[0])])
         test_loss_history.append(np.mean(test_losses))
         test_accuracy_history.append(accuracy(test_outputs, test_labels_used))
 
@@ -572,7 +581,6 @@ def optimization_minibatch_gd(loss_derivative, weights, bias, targets, test_targ
                               num_epochs, train_source_images, train_modulated_images, train_labels, test_source_images,
                               test_modulated_images, test_labels, lrWeights, lrBias, num_shots, batch_size,
                               ideal_conditions, non_ideal_parameters, phase_modulation, **kwargs):
-
     kwargs['batch_size'] = batch_size
 
     return common_optimization(
