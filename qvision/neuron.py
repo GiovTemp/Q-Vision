@@ -30,9 +30,6 @@ class QuantumNeuron:
             f = counter[1] / num_shots
             f_i, self.N = calculate_f_i(weights, Img, num_shots, ideal_conditions, non_ideal_parameters, f, self.N)
 
-        if not ideal_conditions:
-            f_i = np.maximum(f_i, self.last_f)
-
         self.last_f = f_i
 
         return sig(f_i + bias)
