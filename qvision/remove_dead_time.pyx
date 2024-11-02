@@ -1,7 +1,7 @@
 # qvision/remove_dead_time.pyx
 import numpy as np
 cimport numpy as np
-cimport cython  # Aggiungi questa riga
+cimport cython
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
