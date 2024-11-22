@@ -34,32 +34,25 @@ class QuantumNeuron:
 
         return sig(f_i + bias)
 
-    def neuron_phase_modulation(self, weights, bias, modulated_image, num_shots, alfa=385, beta=5.3,
-                                max_iterations=100):
-        # Normalize modulated image
+    def neuron_phase_modulation(self, weights, bias, modulated_image, num_shots):
+        # _, modulated_image = gerchberg_saxton(Source, Target, max_iterations)
         modulated_image = modulated_image / np.linalg.norm(modulated_image)
 
-        # Compute weights phase
-        N = weights.size
-        weights_phase = np.exp(2 * np.pi * 1j * weights) / np.sqrt(N)
-        weights2 = np.fft.fft2(weights_phase) / np.sqrt(N)
+        weights_phase = np.exp(2 * np.pi * 1j * weights)
+        weights_phase = weights_phase / np.linalg.norm(weights_phase)
 
-        # Compute the overlap (inner product)
-        g = np.sum(np.multiply(modulated_image, np.conj(weights2)))
-        prob = np.abs(g) ** 2  # Equivalent to f = abs(g)^2 in MATLAB
-
-        # Calculate sigmoid function with alfa and beta as hyperparameters
-        sigmoid_input = -alfa * (prob + bias) + beta
-        sig_value = 1 / (1 + np.exp(sigmoid_input))
+        weights2 = np.fft.fft2(weights_phase)
+        weights2 = weights2 / np.linalg.norm(weights2)
+        prob = np.abs(np.sum(np.multiply(modulated_image, np.conj(weights2))))**2
 
         if num_shots == -1:
             f = prob
         else:
             samples = np.random.choice([0, 1], num_shots, p=[1 - prob, prob])
             counter = collections.Counter(samples)
-            f = counter[1] / num_shots
+            f = counter[1]/num_shots
 
-        return sig_value
+        return sig(f + bias, 385, 5.3)
 
 
 def spatial_loss_derivative(output, target, weights, bias, Img):
@@ -94,13 +87,7 @@ def spatial_loss_derivative(output, target, weights, bias, Img):
 
     return weights_derivative, bias_derivative
 
-
-def pm_spatial_loss_derivative(output, target, source_image, modulated_image, weights, bias, alfa=385, beta=5.3):
-    """
-    Compute the gradient of the binary cross-entropy with respect to the neuron parameters,
-    incorporating the phase information.
-    """
-    # Error checks
+def pm_spatial_loss_derivative(output, target, source_image, modulated_image, weights, bias):
     if output == 1:
         raise ValueError('Output is 1!')
     elif output <= 0:
@@ -108,37 +95,32 @@ def pm_spatial_loss_derivative(output, target, source_image, modulated_image, we
     elif 1 - output <= 0:
         raise ValueError('Output is greater than 1!')
 
-    F = output  # The neuron's output
-    y = target  # The true label
+    F = output
+    y = target
 
-    # Normalize the modulated image
+    # source_image, modulated_image = gerchberg_saxton(Source, Target, 1000)
     modulated_image = modulated_image / np.linalg.norm(modulated_image)
 
-    # Phase calculations for weights
-    N = weights.size
-    weights_phase = np.exp(2 * np.pi * 1j * weights) / np.sqrt(N)
-    weights2 = np.fft.fft2(weights_phase) / np.sqrt(N)
+    weights_phase = np.exp(2 * np.pi * 1j * weights)
+    weights_phase = weights_phase / np.linalg.norm(weights_phase)
 
-    # Compute g as the inner product between the modulated image and the conjugate of the weights
-    g = np.sum(modulated_image * np.conj(weights2))
-    f = np.abs(g) ** 2  # f = |g|^2
+    weights2 = np.fft.fft2(weights_phase)
+    weights2 = weights2 / np.linalg.norm(weights2)
 
-    # Sigmoid computation
-    sig_value = 1 / (1 + np.exp(-alfa * (f + bias) + beta))
+    g = np.sum(np.multiply(modulated_image, np.conj(weights2)))  # <I, U>
+    gPrime = -2 * np.pi * 1j * np.multiply(source_image, np.conj(weights_phase)) * weights.size # <I, dlambdaU>
 
-    # Binary cross-entropy loss (H) computation
-    H = -y * np.log(sig_value) - (1 - y) * np.log(1 - sig_value)
+    fPrime = 2 * np.real(g * np.conjugate(gPrime))  # 2Re[<I, U><I, dU>*]
 
-    # Calculate gradients
-    gPrime = -2 * np.pi * 1j * source_image * np.conj(weights_phase) * N
-    fPrime = 2 * np.real(g * np.conjugate(gPrime))
-    sigPrime_value = sig_value * (1 - sig_value)
-    HPrime = (sig_value - y) / (sig_value * (1 - sig_value))
+    crossPrime = (F - y) / (F * (1 - F))
 
-    grad_lambda = alfa * HPrime * sigPrime_value * fPrime
-    grad_bias = alfa * HPrime * sigPrime_value
+    gAbs = np.abs(g)  # sqrt(f)
 
-    return grad_lambda, grad_bias
+    weights_derivative = crossPrime * sigPrime(gAbs ** 2 + bias, 385, 5.3) * fPrime
+
+    bias_derivative = crossPrime * sigPrime(gAbs ** 2 + bias, 385, 5.3)
+
+    return weights_derivative, bias_derivative
 
 
 def Fourier_loss_derivative(output, target, weights, bias, Img):
@@ -526,11 +508,9 @@ def sgd_momentum_update(weights, bias, lossWeightsDerivatives, lossBiasDerivativ
 
     return weights, bias, cache
 
-
 def clip_gradients(gradients, clip_value=1.0):
     gradients = np.clip(gradients, -clip_value, clip_value)
     return gradients
-
 
 def optimization_standard_gd(loss_derivative, weights, bias, targets, test_targets, trainImgs, testImgs,
                              num_epochs, train_source_images, train_modulated_images, train_labels, test_source_images,

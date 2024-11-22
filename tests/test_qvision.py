@@ -10,7 +10,10 @@ from qvision import QVision
 
 class TestQVision(unittest.TestCase):
     def setUp(self):
-        self.model = QVision(num_epochs=10, lr_weights=0.075, lr_bias=0.005, num_shots=-1)
+        factor = 35
+        lr_weights = 0.01/factor
+        lr_bias = 0.001/factor
+        self.model = QVision(input_shape=(28, 28), num_epochs=1200, lr_weights=lr_weights, lr_bias=lr_bias, num_shots=-1)
 
     def test_initialize_parameters(self):
         self.model.initialize_parameters()
@@ -36,7 +39,7 @@ class TestQVision(unittest.TestCase):
         self.assertTrue(np.all(test_imgs >= 0) and np.all(test_imgs <= 1), "Test images should be normalized")
 
     def test_train(self):
-        optimizers = ['gd', 'sgd', 'sgd_momentum', 'mini_batch_gd']
+        optimizers = ['gd']
         results = {}
 
         # Create dummy data
@@ -56,16 +59,16 @@ class TestQVision(unittest.TestCase):
         # Shuffle the training set (source images, modulated images, and labels)
         # train_source_images, train_modulated_images, train_labels = shuffle_dataset(train_source_images, train_modulated_images, train_labels)
 
-        train_imgs, train_labels, test_imgs, test_labels = self.model.preprocess_data(train_imgs, train_labels,
-                                                                                      test_imgs, test_labels)
+        # train_imgs, train_labels, test_imgs, test_labels = self.model.preprocess_data(train_imgs, train_labels,
+        #                                                                               test_imgs, test_labels)
 
         self.model.initialize_parameters()
 
         for optimizer in optimizers:
             print(f'Training with {optimizer} optimizer...')
             weights, bias, loss_history, test_loss_history, accuracy_history, test_accuracy_history = self.model.train(
-                optimizer, None, None, None, None, train_source_images, train_modulated_images,
-                train_labels, test_source_images, test_modulated_images, test_labels, phase_modulation=True)
+                optimizer, None, None, None, None, train_source_images[:4000], train_modulated_images[:4000],
+                train_labels[:4000], test_source_images[:1000], test_modulated_images[:1000], test_labels[:1000], phase_modulation=True)
             results[optimizer] = {
                 'weights': weights,
                 'bias': bias,

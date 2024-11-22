@@ -3,9 +3,6 @@ import os
 from keras.datasets import mnist
 import matplotlib.pyplot as plt
 
-def amplitude(z):
-    return np.abs(z)
-
 def phase(z):
     return np.angle(z)
 
@@ -38,9 +35,9 @@ def gerch_sax(I, F, N_tot=10):
 
     for i in range(N_tot):
         A = np.fft.ifft2(D) * np.sqrt(n * m)
-        B = I * np.exp(1j * np.angle(A))
+        B = I * np.exp(1j * phase(A))
         C = np.fft.fft2(B) / np.sqrt(n * m)
-        D = F * np.exp(1j * np.angle(C))
+        D = F * np.exp(1j * phase(C))
         trend[i] = np.linalg.norm(np.abs(C) - np.abs(F))
 
     return B, C
@@ -84,65 +81,6 @@ def process_and_save_images(images, labels, folder_prefix):
 
         if i % 100 == 0:
             print(f'Images processed: {i}')
-
-def load_mnist():
-    # Load the MNIST dataset
-    (trainImgs, trainLabels), (testImgs, testLabels) = mnist.load_data()
-
-    # Filter 0 and 1 from the dataset
-    train0s, test0s = np.where(trainLabels == 0), np.where(testLabels == 0)
-    train1s, test1s = np.where(trainLabels == 1), np.where(testLabels == 1)
-
-    train0sImgs = trainImgs[train0s[0]][:1000]
-    train1sImgs = trainImgs[train1s[0]][:1000]
-
-    test0sImgs = testImgs[test0s[0]][:100]
-    test1sImgs = testImgs[test1s[0]][:100]
-
-    trainImgs = np.concatenate((train0sImgs, train1sImgs), axis=0)
-    testImgs = np.concatenate((test0sImgs, test1sImgs), axis=0)
-
-    # Create the dataset of images and labels (0s and 1s)
-    train0Labels = np.zeros(train0sImgs.shape[0])
-    train1Labels = np.ones(train1sImgs.shape[0])
-    trainLabels = np.concatenate((train0Labels, train1Labels), axis=0)
-
-    test0Labels = np.zeros(test0sImgs.shape[0])
-    test1Labels = np.ones(test1sImgs.shape[0])
-    testLabels = np.concatenate((test0Labels, test1Labels), axis=0)
-
-    # Reshuffle images and labels consistently
-    idxs = np.arange(trainImgs.shape[0])
-    np.random.shuffle(idxs)
-
-    trainImgs = trainImgs[idxs]
-    trainLabels = trainLabels[idxs]
-
-    # Convert to float
-    trainImgs = trainImgs.astype(np.float64)
-    testImgs = testImgs.astype(np.float64)
-    trainLabels = trainLabels.astype(np.float64)
-    testLabels = testLabels.astype(np.float64)
-
-    # Identify each image with the single-photon discretized amplitudes
-    for idx, trainImg in enumerate(trainImgs):
-        trainImgs[idx, :, :] = trainImg / np.sum(trainImg)  # Normalization
-    for idx, testImg in enumerate(testImgs):
-        testImgs[idx, :, :] = testImg / np.sum(testImg)  # Normalization
-
-    # Amplitudes
-    trainImgs = np.sqrt(trainImgs[:, :, :])
-    testImgs = np.sqrt(testImgs[:, :, :])
-
-    # # Padding from 28x28 to 32x32
-    # trainImgs = np.pad(trainImgs, ((0, 0), (2, 2), (2, 2)), mode='constant', constant_values=0)
-    # testImgs = np.pad(testImgs, ((0, 0), (2, 2), (2, 2)), mode='constant', constant_values=0)
-
-    # Reduce the training set
-    trainImgs = trainImgs[:, :, :]
-    trainLabels = trainLabels[:]
-
-    return trainImgs, trainLabels, testImgs, testLabels
 
 def load_images_from_directory(folder_path):
     images = []
@@ -207,13 +145,3 @@ def shuffle_dataset(source_images, modulated_images, labels):
     shuffled_labels = labels[shuffled_indices]
 
     return shuffled_source_images, shuffled_modulated_images, shuffled_labels
-
-if __name__ == '__main__':
-    # Load the MNIST dataset
-    trainImgs, trainLabels, testImgs, testLabels = load_mnist()
-
-    # Process and save training images
-    process_and_save_images(trainImgs, trainLabels, 'training_images')
-
-    # Process and save test images
-    process_and_save_images(testImgs, testLabels, 'test_images')

@@ -1,7 +1,7 @@
 import numpy as np
 from .utils import print_parameters
 
-from .remove_dead_time import remove_dead_time_cython
+# from .remove_dead_time import remove_dead_time_cython
 
 
 
